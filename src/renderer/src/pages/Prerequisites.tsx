@@ -20,18 +20,20 @@ const PREREQ_INFO: Record<Prereq, { label: string; desc: string; installCmd?: [s
     desc: 'Outils de développement Apple (requis pour Homebrew)',
     // Lance la dialog macOS et attend que les CLT soient installés
     installCmd: ['/bin/bash', ['-c',
-      'xcode-select --install 2>&1; ' +
+      'echo "==> Lancement installation Xcode CLT..."; ' +
+      'xcode-select --install 2>&1 || true; ' +
       'echo ""; ' +
-      'echo "Une fenetre macOS va s ouvrir — cliquez Install et attendez (10-15 min)."; ' +
+      'echo ">>> Cherchez la fenetre systeme macOS (peut etre derriere cette app)."; ' +
+      'echo ">>> Cliquez Install dans cette fenetre, puis attendez ici."; ' +
       'echo ""; ' +
-      'count=0; ' +
+      'elapsed=0; ' +
       'while ! xcode-select -p > /dev/null 2>&1; do ' +
-        'count=$((count+1)); ' +
-        'printf "\\r  En attente... %ds" $((count*5)); ' +
-        'sleep 5; ' +
+        'elapsed=$((elapsed+15)); ' +
+        'if [ $elapsed -ge 1800 ]; then echo "TIMEOUT — lancez manuellement: xcode-select --install"; exit 1; fi; ' +
+        'echo "  [${elapsed}s] Attente installation CLT..."; ' +
+        'sleep 15; ' +
       'done; ' +
-      'echo ""; ' +
-      'echo "Xcode CLT installe!"',
+      'echo "==> Xcode CLT installe!"',
     ]],
     installLabel: 'Installer les outils Xcode',
   },

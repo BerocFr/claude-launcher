@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, globalShortcut } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
@@ -47,6 +47,11 @@ app.whenReady().then(() => {
 
   registerIpcHandlers()
   createWindow()
+
+  // DevTools accessibles en prod via Cmd+Shift+I
+  globalShortcut.register('CommandOrControl+Shift+I', () => {
+    BrowserWindow.getAllWindows()[0]?.webContents.toggleDevTools()
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
