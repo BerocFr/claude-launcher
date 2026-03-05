@@ -18,19 +18,21 @@ const PREREQ_INFO: Record<Prereq, { label: string; desc: string; installCmd?: [s
   brew: {
     label: 'Homebrew',
     desc: 'Gestionnaire de paquets pour macOS',
-    installCmd: ['/bin/bash', ['-c', '$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)']],
+    // curl pipe to bash — spawn n'a pas de shell parent pour expand $(...)
+    installCmd: ['/bin/bash', ['-c', 'NONINTERACTIVE=1 curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /bin/bash']],
     installLabel: 'Installer Homebrew',
   },
   node: {
     label: 'Node.js 18+',
     desc: 'Requis pour Claude Code et les serveurs MCP',
-    installCmd: ['/opt/homebrew/bin/brew', ['install', 'node']],
+    // brew résolu via PATH injecté par getEnv() (arm64 + Intel)
+    installCmd: ['/bin/bash', ['-c', 'brew install node']],
     installLabel: 'Installer via Homebrew',
   },
   git: {
     label: 'Git',
     desc: 'Système de contrôle de version',
-    installCmd: ['/opt/homebrew/bin/brew', ['install', 'git']],
+    installCmd: ['/bin/bash', ['-c', 'brew install git']],
     installLabel: 'Installer via Homebrew',
   },
 }
@@ -77,15 +79,7 @@ export function Prerequisites({ onNext }: Props) {
 
     const [cmd, args] = info.installCmd
 
-    // Special case for homebrew: needs bash -c with the curl pipe
-    let actualCmd = cmd
-    let actualArgs = args
-    if (key === 'brew') {
-      actualCmd = '/bin/bash'
-      actualArgs = ['-c', '$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)']
-    }
-
-    const result = await api.runInstall(actualCmd, actualArgs)
+    const result = await api.runInstall(cmd, args)
 
     if (result.success) {
       // Re-check after install
