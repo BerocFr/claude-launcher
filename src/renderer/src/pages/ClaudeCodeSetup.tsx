@@ -59,7 +59,8 @@ export function ClaudeCodeSetup({ onNext }: Props) {
     dispatch({ type: 'SET_CLAUDE_CODE_STATUS', status: 'installing' })
     dispatch({ type: 'CLEAR_TERMINAL' })
 
-    const result = await api.runInstall('npm', ['install', '-g', '@anthropic-ai/claude-code'])
+    // npm n'est pas dans le PATH d'Electron — on passe par bash qui hérite de getEnv()
+    const result = await api.runInstall('/bin/bash', ['-c', 'npm install -g @anthropic-ai/claude-code'])
 
     if (result.success) {
       const check = await api.checkClaudeCode()

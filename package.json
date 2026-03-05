@@ -9,8 +9,7 @@
     "preview": "electron-vite preview",
     "dist": "npm run build && electron-builder",
     "dist:arm64": "npm run build && electron-builder --arm64",
-    "dist:x64": "npm run build && electron-builder --x64",
-    "postinstall": "electron-rebuild"
+    "dist:x64": "npm run build && electron-builder --x64"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.0",

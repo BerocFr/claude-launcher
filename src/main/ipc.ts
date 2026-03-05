@@ -70,7 +70,7 @@ export function registerIpcHandlers(): void {
   // ── Guided installation via PTY ────────────────────────────────────────────
   // Utilise node-pty (vrai TTY) pour que sudo puisse afficher le prompt
   // de mot de passe et l'utilisateur puisse le saisir dans le terminal.
-  ipcMain.handle('install:run', async (event, cmd: string, args: string[]) => {
+  ipcMain.handle('install:run', async (_event, cmd: string, args: string[]) => {
     return new Promise<{ success: boolean; output: string }>((resolve) => {
       const win = getWin()
       const env = getEnv()
@@ -78,22 +78,28 @@ export function registerIpcHandlers(): void {
 
       const cmdStr = [cmd, ...args].join(' ')
       win?.webContents.send('terminal:line', `\x1b[38;5;244m$ ${cmdStr}\x1b[0m\r\n`)
-      win?.webContents.send('terminal:line', `\x1b[38;5;240mTéléchargement en cours, patientez…\x1b[0m\r\n`)
+      win?.webContents.send('terminal:line', `\x1b[38;5;240mDémarrage…\x1b[0m\r\n`)
 
-      installPty = pty.spawn(cmd, args, {
-        name: 'xterm-256color',
-        cols: 120,
-        rows: 40,
-        cwd: os.homedir(),
-        env: {
-          ...env,
-          NONINTERACTIVE: '1',
-          HOMEBREW_NO_ANALYTICS: '1',
-          HOMEBREW_NO_AUTO_UPDATE: '1',
-          HOMEBREW_NO_INSTALL_CLEANUP: '1',
-          CI: '1',
-        } as Record<string, string>,
-      })
+      try {
+        installPty = pty.spawn(cmd, args, {
+          name: 'xterm-256color',
+          cols: 120,
+          rows: 40,
+          cwd: os.homedir(),
+          env: {
+            ...env,
+            NONINTERACTIVE: '1',
+            HOMEBREW_NO_ANALYTICS: '1',
+            HOMEBREW_NO_AUTO_UPDATE: '1',
+            HOMEBREW_NO_INSTALL_CLEANUP: '1',
+            CI: '1',
+          } as Record<string, string>,
+        })
+      } catch (spawnErr: any) {
+        const msg = `\x1b[31m✗ Impossible de lancer le processus: ${spawnErr?.message ?? spawnErr}\x1b[0m\r\n`
+        win?.webContents.send('terminal:line', msg)
+        return resolve({ success: false, output: spawnErr?.message ?? String(spawnErr) })
+      }
 
       installPty.onData((data) => {
         output += data
