@@ -28,12 +28,12 @@ jobs:
         run: npm run build
 
       - name: Package DMG arm64 (Apple Silicon)
-        run: npx electron-builder --arm64
+        run: npx electron-builder --arm64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Package DMG x64 (Intel)
-        run: npx electron-builder --x64
+        run: npx electron-builder --x64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
