@@ -15,6 +15,7 @@ import {
 } from './system'
 
 const terminals = new Map<string, pty.IPty>()
+let installPty: pty.IPty | null = null
 
 function getWin(): BrowserWindow | null {
   return BrowserWindow.getAllWindows()[0] ?? null
@@ -64,49 +65,46 @@ export function registerIpcHandlers(): void {
     terminals.get(id)?.resize(cols, rows)
   })
 
-  // ── Guided installation via stream ─────────────────────────────────────────
-  // Runs a command, streams output to the terminal display, resolves on exit
+  // ── Guided installation via PTY ────────────────────────────────────────────
+  // Utilise node-pty (vrai TTY) pour que sudo puisse afficher le prompt
+  // de mot de passe et l'utilisateur puisse le saisir dans le terminal.
   ipcMain.handle('install:run', async (event, cmd: string, args: string[]) => {
     return new Promise<{ success: boolean; output: string }>((resolve) => {
       const win = getWin()
       const env = getEnv()
       let output = ''
 
-      // Write the command itself to the terminal first
       const cmdStr = [cmd, ...args].join(' ')
       win?.webContents.send('terminal:line', `\x1b[38;5;244m$ ${cmdStr}\x1b[0m\r\n`)
 
-      const child = spawn(cmd, args, {
-        env,
+      installPty = pty.spawn(cmd, args, {
+        name: 'xterm-256color',
+        cols: 120,
+        rows: 40,
         cwd: os.homedir(),
+        env: env as Record<string, string>,
       })
 
-      child.stdout.on('data', (data: Buffer) => {
-        const txt = data.toString()
-        output += txt
-        win?.webContents.send('terminal:line', txt)
+      installPty.onData((data) => {
+        output += data
+        win?.webContents.send('terminal:line', data)
       })
 
-      child.stderr.on('data', (data: Buffer) => {
-        const txt = data.toString()
-        output += txt
-        win?.webContents.send('terminal:line', txt)
-      })
-
-      child.on('close', (code) => {
-        const ok = code === 0
+      installPty.onExit(({ exitCode }) => {
+        installPty = null
+        const ok = exitCode === 0
         const msg = ok
           ? `\x1b[32m✓ Terminé\x1b[0m\r\n`
-          : `\x1b[31m✗ Erreur (code ${code})\x1b[0m\r\n`
+          : `\x1b[31m✗ Erreur (code ${exitCode})\x1b[0m\r\n`
         win?.webContents.send('terminal:line', '\r\n' + msg)
         resolve({ success: ok, output })
       })
-
-      child.on('error', (err) => {
-        win?.webContents.send('terminal:line', `\x1b[31m${err.message}\x1b[0m\r\n`)
-        resolve({ success: false, output: err.message })
-      })
     })
+  })
+
+  // Écrit dans le PTY d'installation (ex : mot de passe sudo)
+  ipcMain.on('install:write', (_, data: string) => {
+    installPty?.write(data)
   })
 
   // ── MCP config ─────────────────────────────────────────────────────────────

@@ -28,6 +28,7 @@ const api = {
   // ── Install runner ─────────────────────────────────────────────────────────
   runInstall: (cmd: string, args: string[]) =>
     ipcRenderer.invoke('install:run', cmd, args),
+  writeInstall: (data: string) => ipcRenderer.send('install:write', data),
 
   // ── MCP config ─────────────────────────────────────────────────────────────
   readMCPConfig: () => ipcRenderer.invoke('mcp:readConfig'),

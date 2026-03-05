@@ -67,11 +67,21 @@ export function InteractiveTerminal({ id = 'main' }: { id?: string }) {
 }
 
 // ── Guided output panel ───────────────────────────────────────────────────────
-// Shows streamed output from guided installs (no PTY, read-only display)
-export function TerminalPanel({ lines }: { lines: string[] }) {
+// Affiche la sortie des installs guidées.
+// Quand onInput est fourni (install PTY actif), le terminal devient
+// interactif : les frappes clavier sont envoyées au PTY (sudo password, etc.)
+export function TerminalPanel({ lines, onInput, installing }: {
+  lines: string[]
+  onInput?: (data: string) => void
+  installing?: boolean
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
+  const onInputRef = useRef(onInput)
   const initialized = useRef(false)
+
+  // Mise à jour de la ref sans re-monter le terminal
+  useEffect(() => { onInputRef.current = onInput }, [onInput])
 
   useEffect(() => {
     if (!containerRef.current || initialized.current) return
@@ -96,11 +106,14 @@ export function TerminalPanel({ lines }: { lines: string[] }) {
       fontFamily: '"SF Mono", Monaco, Menlo, Consolas, "Courier New", monospace',
       fontSize: 12.5,
       lineHeight: 1.55,
-      cursorBlink: false,
-      disableStdin: true,
+      cursorBlink: true,
+      disableStdin: false,
       scrollback: 10000,
       allowProposedApi: true,
     })
+
+    // Transmet les frappes au PTY d'install quand actif
+    term.onData((data) => onInputRef.current?.(data))
 
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
@@ -148,6 +161,11 @@ export function TerminalPanel({ lines }: { lines: string[] }) {
         <span className="w-2.5 h-2.5 rounded-full bg-[#FFBD2E]" />
         <span className="w-2.5 h-2.5 rounded-full bg-[#28C840]" />
         <span className="ml-3 text-xs font-mono text-tx-3">Terminal</span>
+        {installing && (
+          <span className="ml-auto text-[10px] text-warn font-mono animate-pulse-subtle">
+            ⌨ Cliquez ici puis saisissez votre mot de passe admin si demandé
+          </span>
+        )}
       </div>
       <div ref={containerRef} className="flex-1 overflow-hidden" />
     </div>

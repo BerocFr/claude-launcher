@@ -21,6 +21,7 @@ const fallback: Window['api'] = {
   onTerminalData:   () => noop,
   onTerminalLine:   () => noop,
   runInstall:       () => Promise.resolve({ success: false, output: '' }),
+  writeInstall:     noop,
   readMCPConfig:    () => Promise.resolve({ mcpServers: {} }),
   writeMCPConfig:   () => Promise.resolve({ success: true }),
   openExternal:     noopPromise,

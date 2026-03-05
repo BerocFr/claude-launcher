@@ -12,7 +12,7 @@ import { Complete } from './pages/Complete'
 
 function Inner() {
   const { state, dispatch } = useStore()
-  const { step, terminalLines } = state
+  const { step, terminalLines, prereqs, claudeCode, mcp } = state
 
   // Listen for terminal output from guided installs
   useEffect(() => {
@@ -21,6 +21,12 @@ function Inner() {
     })
     return remove
   }, [dispatch])
+
+  // Vrai quand un install PTY est actif → terminal interactif (sudo password)
+  const isInstalling =
+    (['brew', 'node', 'git'] as const).some((k) => prereqs[k] === 'installing') ||
+    claudeCode.installStatus === 'installing' ||
+    Object.values(mcp.installStatus).some((s) => s === 'installing')
 
   const goTo = (s: typeof step) => dispatch({ type: 'SET_STEP', step: s })
 
@@ -57,9 +63,13 @@ function Inner() {
             </div>
           </div>
 
-          {/* Right — terminal */}
+          {/* Right — terminal (interactif pendant les installs pour sudo) */}
           <div className="flex-1 flex flex-col overflow-hidden bg-[#080810]">
-            <TerminalPanel lines={terminalLines} />
+            <TerminalPanel
+              lines={terminalLines}
+              onInput={isInstalling ? api.writeInstall : undefined}
+              installing={isInstalling}
+            />
           </div>
         </div>
       )}
