@@ -1,0 +1,109 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build (renderer + main + preload)
+        run: npm run build
+
+      - name: Package DMG arm64 (Apple Silicon)
+        run: npx electron-builder --arm64
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Package DMG x64 (Intel)
+        run: npx electron-builder --x64
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Read version from package.json
+        id: pkg
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Delete existing release (recreate proprement)
+        run: gh release delete "v${{ steps.pkg.outputs.version }}" --yes --cleanup-tag 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.pkg.outputs.version }}
+          name: Claude Launcher v${{ steps.pkg.outputs.version }}
+          files: |
+            dist/Claude Launcher-${{ steps.pkg.outputs.version }}-arm64.dmg
+            dist/Claude Launcher-${{ steps.pkg.outputs.version }}.dmg
+          body: |
+            ## Claude Launcher v${{ steps.pkg.outputs.version }}
+
+            Installateur macOS clé en main pour **Claude**, **Claude Code** et **MCP**.
+
+            ---
+
+            ### Téléchargement
+
+            | Votre Mac | Fichier |
+            |-----------|---------|
+            | Apple Silicon (M1/M2/M3/M4) | `Claude Launcher-${{ steps.pkg.outputs.version }}-arm64.dmg` |
+            | Intel | `Claude Launcher-${{ steps.pkg.outputs.version }}.dmg` |
+
+            > **Comment savoir ?** Menu Apple → À propos de ce Mac → Puce
+
+            ---
+
+            ### Installation
+
+            **1.** Ouvrir le DMG → glisser **Claude Launcher** dans **Applications**
+
+            **2.** Autoriser l'app (signée en ad-hoc, pas avec un certificat Apple payant) :
+
+            **macOS 12 / 13 / 14** — Clic-droit sur l'app → **Ouvrir** → confirmer
+
+            **macOS 15 Sequoia** — Double-cliquer → aller dans
+            **Réglages Système → Confidentialité & Sécurité → Ouvrir quand même**
+
+            > Ces étapes ne sont nécessaires qu'**une seule fois**.
+
+            ---
+
+            ### Compatibilité
+
+            | macOS | Statut |
+            |-------|--------|
+            | Sequoia 15.x | ✅ |
+            | Sonoma 14.x | ✅ |
+            | Ventura 13.x | ✅ |
+            | Monterey 12.x | ✅ |
+
+            ---
+
+            ### Ce que le launcher installe
+
+            - Homebrew · Node.js 18+ · Git
+            - Claude Code (`@anthropic-ai/claude-code`)
+            - Serveurs MCP au choix (Figma, GitHub, filesystem…)
+
+            **Prérequis** : compte claude.ai — plan Pro, Max ou Team.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
