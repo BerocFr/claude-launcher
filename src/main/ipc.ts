@@ -6,6 +6,7 @@ import * as path from 'path'
 import * as os from 'os'
 import {
   checkMacOS,
+  checkXcodeCLT,
   checkBrew,
   checkNode,
   checkGit,
@@ -24,13 +25,14 @@ function getWin(): BrowserWindow | null {
 export function registerIpcHandlers(): void {
   // ── System checks ──────────────────────────────────────────────────────────
   ipcMain.handle('system:checkAll', async () => {
-    const [macos, brew, node, git] = await Promise.all([
+    const [macos, xcode, brew, node, git] = await Promise.all([
       checkMacOS(),
+      checkXcodeCLT(),
       checkBrew(),
       checkNode(),
       checkGit(),
     ])
-    return { macos, brew, node, git }
+    return { macos, xcode, brew, node, git }
   })
 
   ipcMain.handle('system:checkClaudeCode', async () => checkClaudeCode())
@@ -76,13 +78,21 @@ export function registerIpcHandlers(): void {
 
       const cmdStr = [cmd, ...args].join(' ')
       win?.webContents.send('terminal:line', `\x1b[38;5;244m$ ${cmdStr}\x1b[0m\r\n`)
+      win?.webContents.send('terminal:line', `\x1b[38;5;240mTéléchargement en cours, patientez…\x1b[0m\r\n`)
 
       installPty = pty.spawn(cmd, args, {
         name: 'xterm-256color',
         cols: 120,
         rows: 40,
         cwd: os.homedir(),
-        env: env as Record<string, string>,
+        env: {
+          ...env,
+          NONINTERACTIVE: '1',
+          HOMEBREW_NO_ANALYTICS: '1',
+          HOMEBREW_NO_AUTO_UPDATE: '1',
+          HOMEBREW_NO_INSTALL_CLEANUP: '1',
+          CI: '1',
+        } as Record<string, string>,
       })
 
       installPty.onData((data) => {

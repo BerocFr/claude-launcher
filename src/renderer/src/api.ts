@@ -9,10 +9,11 @@ const noopPromise = () => Promise.resolve() as any
 const fallback: Window['api'] = {
   checkAll: () =>
     Promise.resolve({
-      macos: { installed: false, error: 'Hors Electron' },
-      brew:  { installed: false },
-      node:  { installed: false },
-      git:   { installed: false },
+      macos:  { installed: false, error: 'Hors Electron' },
+      xcode:  { installed: false },
+      brew:   { installed: false },
+      node:   { installed: false },
+      git:    { installed: false },
     }),
   checkClaudeCode:  () => Promise.resolve({ installed: false }),
   createTerminal:   noopPromise,

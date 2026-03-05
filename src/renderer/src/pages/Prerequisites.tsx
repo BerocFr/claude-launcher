@@ -8,24 +8,42 @@ interface Props {
   onNext: () => void
 }
 
-type Prereq = 'macos' | 'brew' | 'node' | 'git'
+type Prereq = 'macos' | 'xcode' | 'brew' | 'node' | 'git'
 
 const PREREQ_INFO: Record<Prereq, { label: string; desc: string; installCmd?: [string, string[]]; installLabel?: string }> = {
   macos: {
     label: 'macOS 12+',
     desc: 'macOS Monterey ou supérieur est requis',
   },
+  xcode: {
+    label: 'Xcode CLT',
+    desc: 'Outils de développement Apple (requis pour Homebrew)',
+    // Lance la dialog macOS et attend que les CLT soient installés
+    installCmd: ['/bin/bash', ['-c',
+      'xcode-select --install 2>&1; ' +
+      'echo ""; ' +
+      'echo "Une fenetre macOS va s ouvrir — cliquez Install et attendez (10-15 min)."; ' +
+      'echo ""; ' +
+      'count=0; ' +
+      'while ! xcode-select -p > /dev/null 2>&1; do ' +
+        'count=$((count+1)); ' +
+        'printf "\\r  En attente... %ds" $((count*5)); ' +
+        'sleep 5; ' +
+      'done; ' +
+      'echo ""; ' +
+      'echo "Xcode CLT installe!"',
+    ]],
+    installLabel: 'Installer les outils Xcode',
+  },
   brew: {
     label: 'Homebrew',
     desc: 'Gestionnaire de paquets pour macOS',
-    // curl pipe to bash — spawn n'a pas de shell parent pour expand $(...)
-    installCmd: ['/bin/bash', ['-c', 'NONINTERACTIVE=1 curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /bin/bash']],
+    installCmd: ['/bin/bash', ['-c', 'curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /bin/bash']],
     installLabel: 'Installer Homebrew',
   },
   node: {
     label: 'Node.js 18+',
     desc: 'Requis pour Claude Code et les serveurs MCP',
-    // brew résolu via PATH injecté par getEnv() (arm64 + Intel)
     installCmd: ['/bin/bash', ['-c', 'brew install node']],
     installLabel: 'Installer via Homebrew',
   },
@@ -46,6 +64,7 @@ export function Prerequisites({ onNext }: Props) {
   const runChecks = async () => {
     setIsChecking(true)
     dispatch({ type: 'SET_PREREQ_STATUS', key: 'macos', status: 'checking' })
+    dispatch({ type: 'SET_PREREQ_STATUS', key: 'xcode', status: 'checking' })
     dispatch({ type: 'SET_PREREQ_STATUS', key: 'brew', status: 'checking' })
     dispatch({ type: 'SET_PREREQ_STATUS', key: 'node', status: 'checking' })
     dispatch({ type: 'SET_PREREQ_STATUS', key: 'git', status: 'checking' })
@@ -96,10 +115,10 @@ export function Prerequisites({ onNext }: Props) {
     }
   }
 
-  const allOk = (['macos', 'brew', 'node', 'git'] as Prereq[]).every(
+  const allOk = (['macos', 'xcode', 'brew', 'node', 'git'] as Prereq[]).every(
     (k) => prereqs[k] === 'ok'
   )
-  const anyInstalling = (['macos', 'brew', 'node', 'git'] as Prereq[]).some(
+  const anyInstalling = (['macos', 'xcode', 'brew', 'node', 'git'] as Prereq[]).some(
     (k) => prereqs[k] === 'installing' || prereqs[k] === 'checking'
   )
 
@@ -116,7 +135,7 @@ export function Prerequisites({ onNext }: Props) {
       </div>
 
       <div className="space-y-3 mb-6">
-        {(['macos', 'brew', 'node', 'git'] as Prereq[]).map((key) => (
+        {(['macos', 'xcode', 'brew', 'node', 'git'] as Prereq[]).map((key) => (
           <StatusItem
             key={key}
             label={PREREQ_INFO[key].label}

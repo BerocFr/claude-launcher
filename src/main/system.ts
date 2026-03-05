@@ -35,6 +35,12 @@ export function getEnv(): NodeJS.ProcessEnv {
   return buildEnv()
 }
 
+export async function checkXcodeCLT(): Promise<CheckResult> {
+  const r = await run('xcode-select', ['-p'])
+  if (r.code === 0) return { installed: true }
+  return { installed: false }
+}
+
 export async function checkMacOS(): Promise<CheckResult> {
   const version = os.release()
   const major = parseInt(version.split('.')[0])

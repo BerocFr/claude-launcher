@@ -21,6 +21,10 @@ export interface MCP {
   docs: string
 }
 
+// PATH injecté dans chaque serveur MCP pour que Claude Desktop (app GUI macOS)
+// trouve npx même si /opt/homebrew/bin n'est pas dans son PATH système.
+const MCP_PATH = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+
 export const MCP_CATALOG: MCP[] = [
   {
     id: 'filesystem',
@@ -43,6 +47,7 @@ export const MCP_CATALOG: MCP[] = [
     buildConfig: (cfg) => ({
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-filesystem', cfg.path || process.env.HOME || '/tmp'],
+      env: { PATH: MCP_PATH },
     }),
     docs: 'https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem',
   },
@@ -68,7 +73,7 @@ export const MCP_CATALOG: MCP[] = [
     buildConfig: (cfg) => ({
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-github'],
-      env: { GITHUB_PERSONAL_ACCESS_TOKEN: cfg.token },
+      env: { GITHUB_PERSONAL_ACCESS_TOKEN: cfg.token, PATH: MCP_PATH },
     }),
     docs: 'https://github.com/modelcontextprotocol/servers/tree/main/src/github',
   },
@@ -94,7 +99,7 @@ export const MCP_CATALOG: MCP[] = [
     buildConfig: (cfg) => ({
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-brave-search'],
-      env: { BRAVE_API_KEY: cfg.apiKey },
+      env: { BRAVE_API_KEY: cfg.apiKey, PATH: MCP_PATH },
     }),
     docs: 'https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search',
   },
@@ -111,6 +116,7 @@ export const MCP_CATALOG: MCP[] = [
     buildConfig: () => ({
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-puppeteer'],
+      env: { PATH: MCP_PATH },
     }),
     docs: 'https://github.com/modelcontextprotocol/servers/tree/main/src/puppeteer',
   },
@@ -135,6 +141,7 @@ export const MCP_CATALOG: MCP[] = [
     buildConfig: (cfg) => ({
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-postgres', cfg.url],
+      env: { PATH: MCP_PATH },
     }),
     docs: 'https://github.com/modelcontextprotocol/servers/tree/main/src/postgres',
   },
@@ -167,7 +174,7 @@ export const MCP_CATALOG: MCP[] = [
     buildConfig: (cfg) => ({
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-slack'],
-      env: { SLACK_BOT_TOKEN: cfg.botToken, SLACK_TEAM_ID: cfg.teamId },
+      env: { SLACK_BOT_TOKEN: cfg.botToken, SLACK_TEAM_ID: cfg.teamId, PATH: MCP_PATH },
     }),
     docs: 'https://github.com/modelcontextprotocol/servers/tree/main/src/slack',
   },
@@ -191,6 +198,7 @@ export const MCP_CATALOG: MCP[] = [
     buildConfig: (cfg) => ({
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-sqlite', cfg.dbPath],
+      env: { PATH: MCP_PATH },
     }),
     docs: 'https://github.com/modelcontextprotocol/servers/tree/main/src/sqlite',
   },
@@ -216,6 +224,7 @@ export const MCP_CATALOG: MCP[] = [
     buildConfig: (cfg) => ({
       command: 'npx',
       args: ['-y', 'figma-developer-mcp', '--figma-api-key', cfg.token, '--stdio'],
+      env: { PATH: MCP_PATH },
     }),
     docs: 'https://github.com/GLips/Figma-Context-MCP',
   },
@@ -241,7 +250,7 @@ export const MCP_CATALOG: MCP[] = [
     buildConfig: (cfg) => ({
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-notion'],
-      env: { NOTION_API_KEY: cfg.apiKey },
+      env: { NOTION_API_KEY: cfg.apiKey, PATH: MCP_PATH },
     }),
     docs: 'https://github.com/modelcontextprotocol/servers',
   },
@@ -258,6 +267,7 @@ export const MCP_CATALOG: MCP[] = [
     buildConfig: () => ({
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-memory'],
+      env: { PATH: MCP_PATH },
     }),
     docs: 'https://github.com/modelcontextprotocol/servers/tree/main/src/memory',
   },

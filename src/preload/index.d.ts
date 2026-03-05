@@ -18,6 +18,7 @@ interface MCPConfig {
 interface API {
   checkAll(): Promise<{
     macos: CheckResult
+    xcode: CheckResult
     brew: CheckResult
     node: CheckResult
     git: CheckResult
