@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+.DS_Store
+*.log
+*.dmg.blockmap
+builder-debug.yml
+.env
+.env.local
+.claude/
