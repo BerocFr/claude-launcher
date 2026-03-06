@@ -121,7 +121,8 @@ export function registerIpcHandlers(): void {
         output += data
         win?.webContents.send('terminal:line', data)
         // Detect sudo password prompt → show native popup in renderer
-        if (/password\s*:/i.test(data) || /mot de passe/i.test(data)) {
+        // Covers: "Password:", "[sudo] password for user:", "Mot de passe pour user:"
+        if (/(password|mot de passe)[^:]*:/i.test(data)) {
           win?.webContents.send('terminal:password-prompt')
         }
         // Detect "not an administrator" error

@@ -40,7 +40,13 @@ const PREREQ_INFO: Record<Prereq, { label: string; desc: string; installCmd?: [s
   brew: {
     label: 'Homebrew',
     desc: 'Gestionnaire de paquets pour macOS',
-    installCmd: ['/bin/bash', ['-c', 'curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /bin/bash']],
+    // sudo -v en tête : authentifie le cache sudo dans ce PTY.
+    // Homebrew (NONINTERACTIVE) réutilise ensuite les credentials via
+    // `sudo --non-interactive` sans redemander le mot de passe.
+    installCmd: ['/bin/bash', ['-c',
+      'sudo -v && ' +
+      'curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /bin/bash'
+    ]],
     installLabel: 'Installer Homebrew',
   },
   node: {
@@ -92,7 +98,9 @@ export function Prerequisites({ onNext }: Props) {
 
   // Vérifie le statut admin au montage
   useEffect(() => {
-    api.checkAdmin().then(({ isAdmin }) => setIsAdmin(isAdmin))
+    api.checkAdmin()
+      .then(({ isAdmin }) => setIsAdmin(isAdmin))
+      .catch(() => setIsAdmin(false)) // en cas d'erreur, supposer non-admin (safe)
   }, [])
 
   useEffect(() => {
