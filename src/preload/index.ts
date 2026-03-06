@@ -40,6 +40,12 @@ const api = {
     return () => ipcRenderer.removeListener('terminal:not-admin', handler)
   },
 
+  onBrewNextStepsDetected: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('terminal:brew-next-steps', handler)
+    return () => ipcRenderer.removeListener('terminal:brew-next-steps', handler)
+  },
+
   // ── Install runner ─────────────────────────────────────────────────────────
   runInstall: (cmd: string, args: string[]) =>
     ipcRenderer.invoke('install:run', cmd, args),

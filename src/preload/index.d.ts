@@ -34,6 +34,7 @@ interface API {
   onTerminalLine(cb: (line: string) => void): () => void
   onPasswordPrompt(cb: () => void): () => void
   onNotAdmin(cb: () => void): () => void
+  onBrewNextStepsDetected(cb: () => void): () => void
   runInstall(cmd: string, args: string[]): Promise<InstallResult>
   writeInstall(data: string): void
   sudoPreauth(password: string): Promise<{ success: boolean; notAdmin: boolean }>

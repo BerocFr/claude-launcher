@@ -32,6 +32,17 @@ function Inner() {
     return remove
   }, [])
 
+  // Show Homebrew PATH modal when "Next steps:" is detected in terminal output
+  // (déclenché dès l'affichage, pas en attendant la fin du process)
+  useEffect(() => {
+    const remove = api.onBrewNextStepsDetected(async () => {
+      const arch = await api.getArch()
+      const brewBin = arch === 'arm64' ? '/opt/homebrew/bin/brew' : '/usr/local/bin/brew'
+      setBrewNextStepsBin(brewBin)
+    })
+    return remove
+  }, [])
+
   // Vrai quand un install PTY est actif → terminal interactif (sudo password)
   const isInstalling =
     (['brew', 'node', 'git'] as const).some((k) => prereqs[k] === 'installing') ||
@@ -43,7 +54,7 @@ function Inner() {
   const renderPage = () => {
     switch (step) {
       case 'welcome':      return <Welcome onNext={() => goTo('prerequisites')} />
-      case 'prerequisites': return <Prerequisites onNext={() => goTo('claude')} onBrewNextSteps={setBrewNextStepsBin} />
+      case 'prerequisites': return <Prerequisites onNext={() => goTo('claude')} />
       case 'claude':       return <ClaudeSetup onNext={() => goTo('claudecode')} />
       case 'claudecode':   return <ClaudeCodeSetup onNext={() => goTo('mcp')} />
       case 'mcp':          return <MCPSetup onNext={() => goTo('complete')} />

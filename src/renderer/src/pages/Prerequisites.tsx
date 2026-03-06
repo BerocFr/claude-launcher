@@ -6,7 +6,6 @@ import { Loader2 } from 'lucide-react'
 
 interface Props {
   onNext: () => void
-  onBrewNextSteps: (brewBin: string) => void
 }
 
 type Prereq = 'macos' | 'xcode' | 'brew' | 'node' | 'git'
@@ -64,7 +63,7 @@ const PREREQ_INFO: Record<Prereq, { label: string; desc: string; installCmd?: [s
   },
 }
 
-export function Prerequisites({ onNext, onBrewNextSteps }: Props) {
+export function Prerequisites({ onNext }: Props) {
   const { state, dispatch } = useStore()
   const { prereqs } = state
   const [isChecking, setIsChecking] = useState(false)
@@ -132,20 +131,14 @@ export function Prerequisites({ onNext, onBrewNextSteps }: Props) {
     const [cmd, args] = info.installCmd
     await api.runInstall(cmd, args)
 
+    // Pour brew : la modal est déclenchée par l'event terminal:brew-next-steps
+    // (détecté dès que Homebrew affiche "Next steps:") — pas en attendant la fin.
+    // On applique juste les vars d'env (best effort) puis checkAll normal.
     if (key === 'brew') {
-      // Détermine le chemin brew depuis l'architecture — fiable sans fs.existsSync
-      // Applique aussi les vars d'env Homebrew au process courant (best effort)
-      let brewBin = '/usr/local/bin/brew' // défaut Intel
-      try {
-        const arch = await api.getArch()
-        brewBin = arch === 'arm64' ? '/opt/homebrew/bin/brew' : '/usr/local/bin/brew'
-        await api.setupBrewPath() // écrit .zprofile + applique env courant
-      } catch { /* ignore : la modal s'affiche quand même */ }
-      onBrewNextSteps(brewBin)
-      return // la modal App.tsx gère la suite via onContinue → checkAll
+      try { await api.setupBrewPath() } catch { /* ignore */ }
     }
 
-    // Autres prérequis : flow normal
+    // Flow normal (brew + autres prérequis)
     const checks = await api.checkAll()
     const r = checks[key]
     dispatch({

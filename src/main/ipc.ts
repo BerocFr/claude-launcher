@@ -130,6 +130,11 @@ export function registerIpcHandlers(): void {
         if (/needs to be an Administrator/i.test(data) || /not.*administrator/i.test(data)) {
           win?.webContents.send('terminal:not-admin')
         }
+        // Detect Homebrew "Next steps:" → affiche la modal PATH immédiatement
+        // (le process brew peut rester actif encore un peu après)
+        if (/next steps?:/i.test(data)) {
+          win?.webContents.send('terminal:brew-next-steps')
+        }
       }
 
       const onDone = (exitCode: number) => {
