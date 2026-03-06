@@ -52,13 +52,13 @@ const PREREQ_INFO: Record<Prereq, { label: string; desc: string; installCmd?: [s
   node: {
     label: 'Node.js 18+',
     desc: 'Requis pour Claude Code et les serveurs MCP',
-    installCmd: ['/bin/bash', ['-c', 'brew install node']],
+    installCmd: ['/bin/bash', ['-c', 'brew install node; brew link --overwrite node 2>/dev/null; true']],
     installLabel: 'Installer via Homebrew',
   },
   git: {
     label: 'Git',
     desc: 'Système de contrôle de version',
-    installCmd: ['/bin/bash', ['-c', 'brew install git']],
+    installCmd: ['/bin/bash', ['-c', 'brew install git; brew link --overwrite git 2>/dev/null; true']],
     installLabel: 'Installer via Homebrew',
   },
 }
