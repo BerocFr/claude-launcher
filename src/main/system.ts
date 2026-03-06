@@ -1,4 +1,4 @@
-import { execFile } from 'child_process'
+import { execFile, execFileSync } from 'child_process'
 import { promisify } from 'util'
 import * as os from 'os'
 import * as fs from 'fs'
@@ -121,6 +121,26 @@ export function setupBrewPath(): { success: boolean; brewBin: string; profiles: 
       }
     } catch { /* ignore */ }
   }
+
+  // Applique les vars d'env Homebrew au process courant (pour la session en cours)
+  // sans ça, `brew install node` peut échouer si HOMEBREW_PREFIX n'est pas défini
+  if (brewBin.startsWith('/opt/homebrew')) {
+    process.env.HOMEBREW_PREFIX     = '/opt/homebrew'
+    process.env.HOMEBREW_CELLAR     = '/opt/homebrew/Cellar'
+    process.env.HOMEBREW_REPOSITORY = '/opt/homebrew'
+  } else {
+    process.env.HOMEBREW_PREFIX     = '/usr/local'
+    process.env.HOMEBREW_CELLAR     = '/usr/local/Cellar'
+    process.env.HOMEBREW_REPOSITORY = '/usr/local/Homebrew'
+  }
+  // Aussi via brew shellenv (plus complet, PATH + MANPATH + INFOPATH)
+  try {
+    const out = execFileSync(brewBin, ['shellenv'], { encoding: 'utf-8', timeout: 5000 })
+    for (const line of out.split('\n')) {
+      const m = line.match(/^export\s+([A-Z_][A-Z0-9_]*)="(.*)"\s*$/)
+      if (m) process.env[m[1]] = m[2].replace(/\$\{([^}:]+)[^}]*\}/g, (_, k) => process.env[k] ?? '')
+    }
+  } catch { /* brew shellenv optionnel */ }
 
   return { success: true, brewBin, profiles: configured }
 }

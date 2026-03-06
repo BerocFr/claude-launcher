@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore, Status } from '../store'
 import { StatusItem } from '../components/StatusItem'
+import { BrewNextStepsModal } from '../components/BrewNextStepsModal'
 import { api } from '../api'
 import { Loader2 } from 'lucide-react'
 
@@ -71,6 +72,7 @@ export function Prerequisites({ onNext }: Props) {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [makingAdmin, setMakingAdmin] = useState(false)
   const [makeAdminError, setMakeAdminError] = useState<string | null>(null)
+  const [brewNextStepsBin, setBrewNextStepsBin] = useState<string | null>(null)
 
   const runChecks = async () => {
     setIsChecking(true)
@@ -129,25 +131,43 @@ export function Prerequisites({ onNext }: Props) {
     dispatch({ type: 'CLEAR_TERMINAL' })
 
     const [cmd, args] = info.installCmd
-    const result = await api.runInstall(cmd, args)
+    await api.runInstall(cmd, args)
 
-    if (result.success) {
-      // Après une install Homebrew réussie, configure automatiquement le PATH
-      // dans ~/.zprofile et ~/.bash_profile (équivalent des "Next steps" affichés par brew)
-      if (key === 'brew') {
-        await api.setupBrewPath()
+    // Après brew : setupBrewPath applique les vars d'env au process courant,
+    // écrit dans .zprofile/.bash_profile, et renvoie le brewBin détecté.
+    // On affiche toujours la modal (brew trouvé = install ok même si exit code ≠ 0).
+    if (key === 'brew') {
+      const pathResult = await api.setupBrewPath()
+      if (pathResult.success) {
+        setBrewNextStepsBin(pathResult.brewBin)
+      } else {
+        // brew introuvable après l'install → erreur
+        dispatch({ type: 'SET_PREREQ_STATUS', key, status: 'error', error: 'Installation échouée — voir le terminal' })
       }
-      const checks = await api.checkAll()
-      const r = checks[key]
-      dispatch({
-        type: 'SET_PREREQ_STATUS', key,
-        status: r.installed ? 'ok' : 'error',
-        version: r.version,
-        error: r.error,
-      })
-    } else {
-      dispatch({ type: 'SET_PREREQ_STATUS', key, status: 'error', error: 'Installation échouée — voir le terminal' })
+      return // la modal (ou l'erreur) prend la suite
     }
+
+    // Autres prérequis : flow normal
+    const checks = await api.checkAll()
+    const r = checks[key]
+    dispatch({
+      type: 'SET_PREREQ_STATUS', key,
+      status: r.installed ? 'ok' : 'error',
+      version: r.version,
+      error: r.error,
+    })
+  }
+
+  const handleBrewContinue = async () => {
+    setBrewNextStepsBin(null)
+    const checks = await api.checkAll()
+    const r = checks.brew
+    dispatch({
+      type: 'SET_PREREQ_STATUS', key: 'brew',
+      status: r.installed ? 'ok' : 'error',
+      version: r.version,
+      error: r.error,
+    })
   }
 
   const allOk = (['macos', 'xcode', 'brew', 'node', 'git'] as Prereq[]).every(
@@ -158,6 +178,10 @@ export function Prerequisites({ onNext }: Props) {
   )
 
   return (
+    <>
+    {brewNextStepsBin && (
+      <BrewNextStepsModal brewBin={brewNextStepsBin} onContinue={handleBrewContinue} />
+    )}
     <div className="animate-slide-up">
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
@@ -250,5 +274,6 @@ export function Prerequisites({ onNext }: Props) {
         </button>
       </div>
     </div>
+    </>
   )
 }
