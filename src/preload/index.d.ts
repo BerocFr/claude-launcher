@@ -24,6 +24,8 @@ interface API {
     git: CheckResult
   }>
   checkClaudeCode(): Promise<CheckResult>
+  checkAdmin(): Promise<{ isAdmin: boolean }>
+  makeAdmin(): Promise<{ success: boolean; error?: string }>
   createTerminal(id: string): Promise<void>
   writeTerminal(id: string, data: string): void
   resizeTerminal(id: string, cols: number, rows: number): void

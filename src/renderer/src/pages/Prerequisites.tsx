@@ -62,6 +62,9 @@ export function Prerequisites({ onNext }: Props) {
   const { prereqs } = state
   const [isChecking, setIsChecking] = useState(false)
   const [hasChecked, setHasChecked] = useState(false)
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+  const [makingAdmin, setMakingAdmin] = useState(false)
+  const [makeAdminError, setMakeAdminError] = useState<string | null>(null)
 
   const runChecks = async () => {
     setIsChecking(true)
@@ -87,9 +90,28 @@ export function Prerequisites({ onNext }: Props) {
     setHasChecked(true)
   }
 
+  // Vérifie le statut admin au montage
+  useEffect(() => {
+    api.checkAdmin().then(({ isAdmin }) => setIsAdmin(isAdmin))
+  }, [])
+
   useEffect(() => {
     runChecks()
   }, [])
+
+  const handleMakeAdmin = async () => {
+    setMakingAdmin(true)
+    setMakeAdminError(null)
+    const result = await api.makeAdmin()
+    setMakingAdmin(false)
+    if (result.success) {
+      setIsAdmin(true)
+      // Relancer les checks (les prérequis sont maintenant débloqués)
+      runChecks()
+    } else {
+      setMakeAdminError(result.error ?? 'Opération annulée')
+    }
+  }
 
   const install = async (key: Prereq) => {
     const info = PREREQ_INFO[key]
@@ -133,6 +155,39 @@ export function Prerequisites({ onNext }: Props) {
           Ces outils sont nécessaires avant d'installer Claude Code et MCP.
         </p>
       </div>
+
+      {/* Banner non-admin */}
+      {isAdmin === false && (
+        <div className="mb-4 p-4 rounded-xl bg-[#1E1620] border border-[#9B72F6]/40">
+          <div className="flex items-start gap-3">
+            <span className="text-lg mt-0.5">⚠️</span>
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-[#C4B5FD] mb-1">
+                Compte non-administrateur
+              </div>
+              <p className="text-xs text-tx-2 leading-relaxed mb-3">
+                Votre compte macOS n'a pas les droits admin. Homebrew (et les
+                installations suivantes) requiert sudo. Cliquez pour vous promouvoir
+                — la dialog macOS accepte les identifiants de <strong className="text-tx-1">n'importe quel admin</strong> présent sur ce Mac.
+              </p>
+              {makeAdminError && (
+                <p className="text-xs text-[#F87171] mb-2">⛔ {makeAdminError}</p>
+              )}
+              <button
+                onClick={handleMakeAdmin}
+                disabled={makingAdmin}
+                className="no-drag flex items-center gap-2 px-4 py-2 rounded-lg bg-[#9B72F6] hover:bg-[#8B62E6] text-white text-xs font-semibold disabled:opacity-50 transition-colors"
+              >
+                {makingAdmin ? (
+                  <><Loader2 size={12} className="animate-spin-slow" /> Promotion en cours…</>
+                ) : (
+                  '🔑 Devenir administrateur'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3 mb-6">
         {(['macos', 'xcode', 'brew', 'node', 'git'] as Prereq[]).map((key) => (

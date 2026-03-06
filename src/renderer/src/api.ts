@@ -16,6 +16,8 @@ const fallback: Window['api'] = {
       git:    { installed: false },
     }),
   checkClaudeCode:  () => Promise.resolve({ installed: false }),
+  checkAdmin:       () => Promise.resolve({ isAdmin: true }),
+  makeAdmin:        () => Promise.resolve({ success: false, error: 'Hors Electron' }),
   createTerminal:   noopPromise,
   writeTerminal:    noop,
   resizeTerminal:   noop,

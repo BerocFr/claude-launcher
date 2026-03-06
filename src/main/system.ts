@@ -35,6 +35,15 @@ export function getEnv(): NodeJS.ProcessEnv {
   return buildEnv()
 }
 
+/** Vérifie si le compte courant est dans le groupe admin macOS */
+export async function checkIsAdmin(): Promise<boolean> {
+  const username = os.userInfo().username
+  const r = await run('/usr/bin/dsmemberutil', [
+    'checkmembership', '-U', username, '-G', 'admin'
+  ])
+  return r.code === 0 && r.stdout.includes('is a member')
+}
+
 export async function checkXcodeCLT(): Promise<CheckResult> {
   const r = await run('xcode-select', ['-p'])
   if (r.code === 0) return { installed: true }

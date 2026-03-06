@@ -11,6 +11,7 @@ import {
   checkNode,
   checkGit,
   checkClaudeCode,
+  checkIsAdmin,
   verifyApiKey,
   getEnv,
 } from './system'
@@ -39,6 +40,33 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('system:checkClaudeCode', async () => checkClaudeCode())
 
   ipcMain.handle('system:verifyApiKey', async (_, key: string) => verifyApiKey(key))
+
+  /** Vérifie si le compte courant est administrateur macOS */
+  ipcMain.handle('system:checkAdmin', async () => {
+    return { isAdmin: await checkIsAdmin() }
+  })
+
+  /**
+   * Rend le compte courant administrateur via osascript.
+   * La dialog macOS native accepte les credentials de n'importe quel
+   * compte admin présent sur le Mac (pas forcément le compte courant).
+   */
+  ipcMain.handle('install:make-admin', async () => {
+    const username = os.userInfo().username
+    return new Promise<{ success: boolean; error?: string }>((resolve) => {
+      const child = spawn('/usr/bin/osascript', [
+        '-e',
+        `do shell script "dseditgroup -o edit -a '${username}' -t user admin" with administrator privileges`,
+      ], { stdio: ['ignore', 'pipe', 'pipe'] })
+      let stderr = ''
+      child.stderr?.on('data', (d: Buffer) => { stderr += d.toString() })
+      child.on('close', (code) => {
+        if (code === 0) resolve({ success: true })
+        else resolve({ success: false, error: stderr.trim() || 'Opération annulée' })
+      })
+      child.on('error', (err) => resolve({ success: false, error: err.message }))
+    })
+  })
 
   // ── Terminal PTY ────────────────────────────────────────────────────────────
   ipcMain.handle('terminal:create', (event, id: string) => {
