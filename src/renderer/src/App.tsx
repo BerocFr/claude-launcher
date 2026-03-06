@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { AppProvider, useStore } from './store'
 import { api } from './api'
 import { StepNav } from './components/StepNav'
 import { TerminalPanel } from './components/Terminal'
+import { PasswordModal } from './components/PasswordModal'
 import { Welcome } from './pages/Welcome'
 import { Prerequisites } from './pages/Prerequisites'
 import { ClaudeSetup } from './pages/ClaudeSetup'
@@ -13,6 +14,7 @@ import { Complete } from './pages/Complete'
 function Inner() {
   const { state, dispatch } = useStore()
   const { step, terminalLines, prereqs, claudeCode, mcp } = state
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
 
   // Listen for terminal output from guided installs
   useEffect(() => {
@@ -21,6 +23,12 @@ function Inner() {
     })
     return remove
   }, [dispatch])
+
+  // Show password popup when sudo prompts
+  useEffect(() => {
+    const remove = api.onPasswordPrompt(() => setShowPasswordModal(true))
+    return remove
+  }, [])
 
   // Vrai quand un install PTY est actif → terminal interactif (sudo password)
   const isInstalling =
@@ -45,6 +53,18 @@ function Inner() {
 
   return (
     <div className="flex flex-col h-screen bg-surface overflow-hidden">
+      {showPasswordModal && (
+        <PasswordModal
+          onSubmit={(pwd) => {
+            api.writeInstall(pwd + '\r')
+            setShowPasswordModal(false)
+          }}
+          onCancel={() => {
+            api.writeInstall('\x03')
+            setShowPasswordModal(false)
+          }}
+        />
+      )}
       {/* macOS traffic light drag region */}
       <div className="drag-region absolute top-0 left-0 right-0 h-10 z-50 pointer-events-none" />
 

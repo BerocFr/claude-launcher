@@ -25,6 +25,12 @@ const api = {
     return () => ipcRenderer.removeListener('terminal:line', handler)
   },
 
+  onPasswordPrompt: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('terminal:password-prompt', handler)
+    return () => ipcRenderer.removeListener('terminal:password-prompt', handler)
+  },
+
   // ── Install runner ─────────────────────────────────────────────────────────
   runInstall: (cmd: string, args: string[]) =>
     ipcRenderer.invoke('install:run', cmd, args),

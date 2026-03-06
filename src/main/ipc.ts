@@ -91,6 +91,10 @@ export function registerIpcHandlers(): void {
       const sendLine = (data: string) => {
         output += data
         win?.webContents.send('terminal:line', data)
+        // Detect sudo password prompt → show native popup in renderer
+        if (/password\s*:/i.test(data) || /mot de passe/i.test(data)) {
+          win?.webContents.send('terminal:password-prompt')
+        }
       }
 
       const onDone = (exitCode: number) => {

@@ -29,6 +29,7 @@ interface API {
   resizeTerminal(id: string, cols: number, rows: number): void
   onTerminalData(id: string, cb: (data: string) => void): () => void
   onTerminalLine(cb: (line: string) => void): () => void
+  onPasswordPrompt(cb: () => void): () => void
   runInstall(cmd: string, args: string[]): Promise<InstallResult>
   writeInstall(data: string): void
   readMCPConfig(): Promise<MCPConfig>

@@ -21,6 +21,7 @@ const fallback: Window['api'] = {
   resizeTerminal:   noop,
   onTerminalData:   () => noop,
   onTerminalLine:   () => noop,
+  onPasswordPrompt: () => noop,
   runInstall:       () => Promise.resolve({ success: false, output: '' }),
   writeInstall:     noop,
   readMCPConfig:    () => Promise.resolve({ mcpServers: {} }),
