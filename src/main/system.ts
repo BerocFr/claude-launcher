@@ -1,4 +1,4 @@
-import { execFile, execFileSync } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import * as os from 'os'
 import * as fs from 'fs'
@@ -22,11 +22,39 @@ async function run(cmd: string, args: string[]): Promise<{ stdout: string; code:
   }
 }
 
+/**
+ * Trouve le répertoire bin NVM le plus récent installé localement.
+ * Ex: ~/.nvm/versions/node/v22.14.0/bin
+ */
+function nvmBinPath(): string | null {
+  const nvmVersionsDir = path.join(os.homedir(), '.nvm', 'versions', 'node')
+  if (!fs.existsSync(nvmVersionsDir)) return null
+  try {
+    const versions = fs.readdirSync(nvmVersionsDir)
+      .filter((v) => v.startsWith('v'))
+      .sort((a, b) => {
+        const toN = (s: string) => s.slice(1).split('.').map(Number)
+        const [aMaj, aMin, aPat] = toN(a)
+        const [bMaj, bMin, bPat] = toN(b)
+        return bMaj - aMaj || bMin - aMin || bPat - aPat
+      })
+    if (versions.length === 0) return null
+    return path.join(nvmVersionsDir, versions[0], 'bin')
+  } catch {
+    return null
+  }
+}
+
 function buildEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env }
-  const brewPaths = ['/opt/homebrew/bin', '/usr/local/bin']
+  const extraPaths: string[] = []
+
+  // NVM node bin (détecté dynamiquement après install)
+  const nvm = nvmBinPath()
+  if (nvm) extraPaths.push(nvm)
+
   const existing = (env.PATH || '').split(':')
-  for (const p of brewPaths) {
+  for (const p of extraPaths) {
     if (!existing.includes(p)) existing.unshift(p)
   }
   env.PATH = existing.join(':')
@@ -37,6 +65,19 @@ export function getEnv(): NodeJS.ProcessEnv {
   return buildEnv()
 }
 
+/**
+ * Met à jour process.env.PATH pour inclure le bin NVM courant.
+ * À appeler après une install NVM pour que les prochains spawns trouvent node/npm.
+ */
+export function setupNvmPath(): void {
+  const nvm = nvmBinPath()
+  if (!nvm) return
+  const existing = (process.env.PATH || '').split(':')
+  if (!existing.includes(nvm)) {
+    process.env.PATH = [nvm, ...existing].join(':')
+  }
+}
+
 /** Vérifie si le compte courant est dans le groupe admin macOS */
 export async function checkIsAdmin(): Promise<boolean> {
   const username = os.userInfo().username
@@ -44,12 +85,6 @@ export async function checkIsAdmin(): Promise<boolean> {
     'checkmembership', '-U', username, '-G', 'admin'
   ])
   return r.code === 0 && r.stdout.includes('is a member')
-}
-
-export async function checkXcodeCLT(): Promise<CheckResult> {
-  const r = await run('xcode-select', ['-p'])
-  if (r.code === 0) return { installed: true }
-  return { installed: false }
 }
 
 export async function checkMacOS(): Promise<CheckResult> {
@@ -63,18 +98,8 @@ export async function checkMacOS(): Promise<CheckResult> {
   return { installed: true, version: stdout }
 }
 
-export async function checkBrew(): Promise<CheckResult> {
-  const paths = ['/opt/homebrew/bin/brew', '/usr/local/bin/brew']
-  for (const p of paths) {
-    const r = await run(p, ['--version'])
-    if (r.code === 0) {
-      return { installed: true, version: r.stdout.split('\n')[0].replace('Homebrew ', '') }
-    }
-  }
-  return { installed: false }
-}
-
 export async function checkNode(): Promise<CheckResult> {
+  // 1. Cherche node dans le PATH courant (inclut NVM via buildEnv)
   const r = await run('node', ['--version'])
   if (r.code === 0) {
     const version = r.stdout.replace('v', '')
@@ -82,67 +107,27 @@ export async function checkNode(): Promise<CheckResult> {
     if (major < 18) return { installed: false, version, error: 'Node.js 18+ requis' }
     return { installed: true, version }
   }
-  return { installed: false }
-}
 
-export async function checkGit(): Promise<CheckResult> {
-  const r = await run('git', ['--version'])
-  if (r.code === 0) {
-    return { installed: true, version: r.stdout.replace('git version ', '') }
-  }
-  return { installed: false }
-}
-
-/**
- * Configure le PATH Homebrew dans les profils shell de l'utilisateur.
- * Écrit la ligne `eval "$(brew shellenv)"` dans ~/.zprofile et ~/.bash_profile
- * si elle n'est pas déjà présente. Utilise Node.js fs directement pour éviter
- * les problèmes d'échappement bash.
- */
-export function setupBrewPath(): { success: boolean; brewBin: string; profiles: string[] } {
-  const brewBins = ['/opt/homebrew/bin/brew', '/usr/local/bin/brew']
-  const brewBin = brewBins.find((b) => fs.existsSync(b)) ?? ''
-
-  if (!brewBin) return { success: false, brewBin: '', profiles: [] }
-
-  const evalLine = `eval "$(${brewBin} shellenv)"`
-  const profilePaths = [
-    path.join(os.homedir(), '.zprofile'),
-    path.join(os.homedir(), '.bash_profile'),
-  ]
-  const configured: string[] = []
-
-  for (const profilePath of profilePaths) {
-    try {
-      const existing = fs.existsSync(profilePath) ? fs.readFileSync(profilePath, 'utf-8') : ''
-      if (!existing.includes('brew shellenv')) {
-        fs.appendFileSync(profilePath, `\n# Homebrew\n${evalLine}\n`, 'utf-8')
-        configured.push(path.basename(profilePath))
+  // 2. Cherche directement dans ~/.nvm (fallback si PATH pas encore mis à jour)
+  const nvm = nvmBinPath()
+  if (nvm) {
+    const nodeBin = path.join(nvm, 'node')
+    if (fs.existsSync(nodeBin)) {
+      const r2 = await execAsync(nodeBin, ['--version'], { env: buildEnv() })
+        .then(({ stdout }) => ({ stdout: stdout.trim(), code: 0 }))
+        .catch((e) => ({ stdout: e?.stdout?.trim() || '', code: 1 }))
+      if (r2.code === 0) {
+        // Met à jour PATH pour la suite
+        setupNvmPath()
+        const version = r2.stdout.replace('v', '')
+        const major = parseInt(version.split('.')[0])
+        if (major < 18) return { installed: false, version, error: 'Node.js 18+ requis' }
+        return { installed: true, version }
       }
-    } catch { /* ignore */ }
-  }
-
-  // Applique les vars d'env Homebrew au process courant (pour la session en cours)
-  // sans ça, `brew install node` peut échouer si HOMEBREW_PREFIX n'est pas défini
-  if (brewBin.startsWith('/opt/homebrew')) {
-    process.env.HOMEBREW_PREFIX     = '/opt/homebrew'
-    process.env.HOMEBREW_CELLAR     = '/opt/homebrew/Cellar'
-    process.env.HOMEBREW_REPOSITORY = '/opt/homebrew'
-  } else {
-    process.env.HOMEBREW_PREFIX     = '/usr/local'
-    process.env.HOMEBREW_CELLAR     = '/usr/local/Cellar'
-    process.env.HOMEBREW_REPOSITORY = '/usr/local/Homebrew'
-  }
-  // Aussi via brew shellenv (plus complet, PATH + MANPATH + INFOPATH)
-  try {
-    const out = execFileSync(brewBin, ['shellenv'], { encoding: 'utf-8', timeout: 5000 })
-    for (const line of out.split('\n')) {
-      const m = line.match(/^export\s+([A-Z_][A-Z0-9_]*)="(.*)"\s*$/)
-      if (m) process.env[m[1]] = m[2].replace(/\$\{([^}:]+)[^}]*\}/g, (_, k) => process.env[k] ?? '')
     }
-  } catch { /* brew shellenv optionnel */ }
+  }
 
-  return { success: true, brewBin, profiles: configured }
+  return { installed: false }
 }
 
 export async function checkClaudeCode(): Promise<CheckResult> {

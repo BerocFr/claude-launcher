@@ -7,17 +7,13 @@ const noop = () => {}
 const noopPromise = () => Promise.resolve() as any
 
 const fallback: Window['api'] = {
-  getArch: () => Promise.resolve('arm64'),
   checkAll: () =>
     Promise.resolve({
-      macos:  { installed: false, error: 'Hors Electron' },
-      xcode:  { installed: false },
-      brew:   { installed: false },
-      node:   { installed: false },
-      git:    { installed: false },
+      macos: { installed: false, error: 'Hors Electron' },
+      node:  { installed: false },
     }),
   checkClaudeCode:  () => Promise.resolve({ installed: false }),
-  checkAdmin:       () => Promise.resolve({ isAdmin: true }),
+  checkAdmin:       () => Promise.resolve({ isAdmin: false }),
   makeAdmin:        () => Promise.resolve({ success: false, error: 'Hors Electron' }),
   createTerminal:   noopPromise,
   writeTerminal:    noop,
@@ -25,13 +21,10 @@ const fallback: Window['api'] = {
   onTerminalData:   () => noop,
   onTerminalLine:   () => noop,
   onPasswordPrompt: () => noop,
-  onNotAdmin:                () => noop,
-  onBrewNextStepsDetected:   () => noop,
-  onBrewLinkNeeded:          () => noop,
+  onNotAdmin:       () => noop,
   runInstall:       () => Promise.resolve({ success: false, output: '' }),
   writeInstall:     noop,
   sudoPreauth:      () => Promise.resolve({ success: false, notAdmin: false }),
-  setupBrewPath:    () => Promise.resolve({ success: false, brewBin: '', profiles: [] }),
   readMCPConfig:    () => Promise.resolve({ mcpServers: {} }),
   writeMCPConfig:   () => Promise.resolve({ success: true }),
   openExternal:     noopPromise,

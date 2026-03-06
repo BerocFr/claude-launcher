@@ -4,8 +4,6 @@ import { api } from './api'
 import { StepNav } from './components/StepNav'
 import { TerminalPanel } from './components/Terminal'
 import { PasswordModal } from './components/PasswordModal'
-import { BrewNextStepsModal } from './components/BrewNextStepsModal'
-import { BrewLinkModal } from './components/BrewLinkModal'
 import { Welcome } from './pages/Welcome'
 import { Prerequisites } from './pages/Prerequisites'
 import { ClaudeSetup } from './pages/ClaudeSetup'
@@ -17,8 +15,6 @@ function Inner() {
   const { state, dispatch } = useStore()
   const { step, terminalLines, prereqs, claudeCode, mcp } = state
   const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [brewNextStepsBin, setBrewNextStepsBin] = useState<string | null>(null)
-  const [brewLinkPkg, setBrewLinkPkg] = useState<string | null>(null)
 
   // Listen for terminal output from guided installs
   useEffect(() => {
@@ -34,26 +30,9 @@ function Inner() {
     return remove
   }, [])
 
-  // Show Homebrew PATH modal when "Next steps:" is detected in terminal output
-  // (déclenché dès l'affichage, pas en attendant la fin du process)
-  useEffect(() => {
-    const remove = api.onBrewNextStepsDetected(async () => {
-      const arch = await api.getArch()
-      const brewBin = arch === 'arm64' ? '/opt/homebrew/bin/brew' : '/usr/local/bin/brew'
-      setBrewNextStepsBin(brewBin)
-    })
-    return remove
-  }, [])
-
-  // Show brew link modal when "brew link --overwrite <pkg>" is detected
-  useEffect(() => {
-    const remove = api.onBrewLinkNeeded((pkg) => setBrewLinkPkg(pkg))
-    return remove
-  }, [])
-
   // Vrai quand un install PTY est actif → terminal interactif (sudo password)
   const isInstalling =
-    (['brew', 'node', 'git'] as const).some((k) => prereqs[k] === 'installing') ||
+    prereqs.node === 'installing' ||
     claudeCode.installStatus === 'installing' ||
     Object.values(mcp.installStatus).some((s) => s === 'installing')
 
@@ -83,45 +62,6 @@ function Inner() {
           onCancel={() => {
             api.writeInstall('\x03')
             setShowPasswordModal(false)
-          }}
-        />
-      )}
-      {brewNextStepsBin && (
-        <BrewNextStepsModal
-          brewBin={brewNextStepsBin}
-          onContinue={async () => {
-            setBrewNextStepsBin(null)
-            // Vérifie que brew est bien installé et met à jour le statut
-            const checks = await api.checkAll()
-            const r = checks.brew
-            dispatch({
-              type: 'SET_PREREQ_STATUS', key: 'brew',
-              status: r.installed ? 'ok' : 'error',
-              version: r.version,
-              error: r.error,
-            })
-          }}
-        />
-      )}
-      {brewLinkPkg && (
-        <BrewLinkModal
-          pkg={brewLinkPkg}
-          onContinue={async () => {
-            const pkg = brewLinkPkg
-            setBrewLinkPkg(null)
-            dispatch({ type: 'CLEAR_TERMINAL' })
-            await api.runInstall('/bin/bash', ['-c', `sudo brew link --overwrite ${pkg}`])
-            const checks = await api.checkAll()
-            const key = pkg as 'node' | 'git'
-            const r = checks[key]
-            if (r) {
-              dispatch({
-                type: 'SET_PREREQ_STATUS', key,
-                status: r.installed ? 'ok' : 'error',
-                version: r.version,
-                error: r.error,
-              })
-            }
           }}
         />
       )}

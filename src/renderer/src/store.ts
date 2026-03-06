@@ -9,10 +9,7 @@ export interface AppState {
   step: Step
   prereqs: {
     macos: Status
-    xcode: Status
-    brew: Status
     node: Status
-    git: Status
     versions: Record<string, string>
     errors: Record<string, string>
   }
@@ -37,7 +34,7 @@ export interface AppState {
 const initialState: AppState = {
   step: 'welcome',
   prereqs: {
-    macos: 'idle', xcode: 'idle', brew: 'idle', node: 'idle', git: 'idle',
+    macos: 'idle', node: 'idle',
     versions: {}, errors: {},
   },
   claude: { plan: null },

@@ -6,13 +6,10 @@ import * as path from 'path'
 import * as os from 'os'
 import {
   checkMacOS,
-  checkXcodeCLT,
-  checkBrew,
   checkNode,
-  checkGit,
   checkClaudeCode,
   checkIsAdmin,
-  setupBrewPath,
+  setupNvmPath,
   verifyApiKey,
   getEnv,
 } from './system'
@@ -28,14 +25,8 @@ function getWin(): BrowserWindow | null {
 export function registerIpcHandlers(): void {
   // ── System checks ──────────────────────────────────────────────────────────
   ipcMain.handle('system:checkAll', async () => {
-    const [macos, xcode, brew, node, git] = await Promise.all([
-      checkMacOS(),
-      checkXcodeCLT(),
-      checkBrew(),
-      checkNode(),
-      checkGit(),
-    ])
-    return { macos, xcode, brew, node, git }
+    const [macos, node] = await Promise.all([checkMacOS(), checkNode()])
+    return { macos, node }
   })
 
   ipcMain.handle('system:checkClaudeCode', async () => checkClaudeCode())
@@ -105,15 +96,10 @@ export function registerIpcHandlers(): void {
       const win = getWin()
       const env = {
         ...getEnv(),
-        NONINTERACTIVE: '1',
-        HOMEBREW_NO_ANALYTICS: '1',
-        HOMEBREW_NO_AUTO_UPDATE: '1',
-        HOMEBREW_NO_INSTALL_CLEANUP: '1',
         CI: '1',
         FORCE_COLOR: '1',
       }
       let output = ''
-      let brewLinkEmitted = false
 
       const cmdStr = [cmd, ...args].join(' ')
       win?.webContents.send('terminal:line', `\x1b[38;5;244m$ ${cmdStr}\x1b[0m\r\n`)
@@ -131,23 +117,9 @@ export function registerIpcHandlers(): void {
         if (/needs to be an Administrator/i.test(data) || /not.*administrator/i.test(data)) {
           win?.webContents.send('terminal:not-admin')
         }
-        // Detect Homebrew "Next steps:" → affiche la modal PATH immédiatement
-        // (le process brew peut rester actif encore un peu après)
-        if (/next steps?:/i.test(data)) {
-          win?.webContents.send('terminal:brew-next-steps')
-        }
-        // Detect "brew link --overwrite <pkg>" suggestion → affiche la modal d'action
-        // et tue le process courant (il a échoué à la phase link, inutile de continuer)
-        if (!brewLinkEmitted) {
-          const m = data.match(/brew link --overwrite (\S+)/)
-          if (m) {
-            brewLinkEmitted = true
-            win?.webContents.send('terminal:brew-link-needed', m[1])
-            setTimeout(() => {
-              installPty?.kill()
-              if (installChild?.pid) installChild.kill('SIGTERM')
-            }, 300)
-          }
+        // Après install NVM, met à jour PATH du process principal
+        if (/nvm install|now using node/i.test(data)) {
+          setupNvmPath()
         }
       }
 
@@ -269,28 +241,6 @@ export function registerIpcHandlers(): void {
       })
       child.on('error', () => resolve({ success: false, notAdmin: false }))
     })
-  })
-
-  // ── Architecture du process hôte ────────────────────────────────────────────
-  ipcMain.handle('system:arch', () => process.arch)
-
-  // ── Post-install Homebrew PATH setup ───────────────────────────────────────
-  // Écrit la ligne `eval "$(brew shellenv)"` dans ~/.zprofile et ~/.bash_profile
-  // via Node.js fs (pas de bash, pas de problème d'échappement).
-  ipcMain.handle('install:setup-brew-path', () => {
-    const win = getWin()
-    const result = setupBrewPath()
-    if (result.success) {
-      const profiles = result.profiles.length > 0
-        ? result.profiles.join(' et ')
-        : 'déjà configuré'
-      win?.webContents.send('terminal:line',
-        `\x1b[32m✓ Homebrew PATH ajouté à ${profiles}\x1b[0m\r\n`)
-    } else {
-      win?.webContents.send('terminal:line',
-        `\x1b[33m⚠ brew introuvable pour la config PATH\x1b[0m\r\n`)
-    }
-    return result
   })
 
   // ── MCP config ─────────────────────────────────────────────────────────────

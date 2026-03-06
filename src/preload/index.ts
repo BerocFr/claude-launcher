@@ -7,7 +7,6 @@ const api = {
   checkClaudeCode: () => ipcRenderer.invoke('system:checkClaudeCode'),
   checkAdmin: () => ipcRenderer.invoke('system:checkAdmin'),
   makeAdmin: () => ipcRenderer.invoke('install:make-admin'),
-  getArch: () => ipcRenderer.invoke('system:arch'),
 
   // ── Terminal PTY ────────────────────────────────────────────────────────────
   createTerminal: (id: string) => ipcRenderer.invoke('terminal:create', id),
@@ -40,25 +39,12 @@ const api = {
     return () => ipcRenderer.removeListener('terminal:not-admin', handler)
   },
 
-  onBrewNextStepsDetected: (cb: () => void) => {
-    const handler = () => cb()
-    ipcRenderer.on('terminal:brew-next-steps', handler)
-    return () => ipcRenderer.removeListener('terminal:brew-next-steps', handler)
-  },
-
-  onBrewLinkNeeded: (cb: (pkg: string) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, pkg: string) => cb(pkg)
-    ipcRenderer.on('terminal:brew-link-needed', handler)
-    return () => ipcRenderer.removeListener('terminal:brew-link-needed', handler)
-  },
-
   // ── Install runner ─────────────────────────────────────────────────────────
   runInstall: (cmd: string, args: string[]) =>
     ipcRenderer.invoke('install:run', cmd, args),
   writeInstall: (data: string) => ipcRenderer.send('install:write', data),
   sudoPreauth: (password: string) =>
     ipcRenderer.invoke('install:sudo-preauth', password),
-  setupBrewPath: () => ipcRenderer.invoke('install:setup-brew-path'),
 
   // ── MCP config ─────────────────────────────────────────────────────────────
   readMCPConfig: () => ipcRenderer.invoke('mcp:readConfig'),

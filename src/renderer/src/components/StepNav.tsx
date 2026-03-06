@@ -1,7 +1,7 @@
 import { Step } from '../store'
 
 const STEPS: { id: Step; label: string; num: number }[] = [
-  { id: 'prerequisites', label: 'Prérequis', num: 1 },
+  { id: 'prerequisites', label: 'Node.js', num: 1 },
   { id: 'claude', label: 'Claude', num: 2 },
   { id: 'claudecode', label: 'Claude Code', num: 3 },
   { id: 'mcp', label: 'MCP', num: 4 },
