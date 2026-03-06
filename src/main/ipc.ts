@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow, shell } from 'electron'
-import { spawn } from 'child_process'
+import { spawn, ChildProcess } from 'child_process'
 import * as pty from 'node-pty'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -17,6 +17,7 @@ import {
 
 const terminals = new Map<string, pty.IPty>()
 let installPty: pty.IPty | null = null
+let installChild: ChildProcess | null = null
 
 function getWin(): BrowserWindow | null {
   return BrowserWindow.getAllWindows()[0] ?? null
@@ -95,10 +96,15 @@ export function registerIpcHandlers(): void {
         if (/password\s*:/i.test(data) || /mot de passe/i.test(data)) {
           win?.webContents.send('terminal:password-prompt')
         }
+        // Detect "not an administrator" error
+        if (/needs to be an Administrator/i.test(data) || /not.*administrator/i.test(data)) {
+          win?.webContents.send('terminal:not-admin')
+        }
       }
 
       const onDone = (exitCode: number) => {
         installPty = null
+        installChild = null
         const ok = exitCode === 0
         const msg = ok
           ? `\x1b[32m✓ Terminé\x1b[0m\r\n`
@@ -119,30 +125,59 @@ export function registerIpcHandlers(): void {
         installPty.onData(sendLine)
         installPty.onExit(({ exitCode }) => onDone(exitCode))
         return // PTY OK, on sort
-      } catch {
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        win?.webContents.send('terminal:line', `\x1b[38;5;240m(PTY: ${msg})\x1b[0m\r\n`)
         installPty = null
       }
 
       // ── Fallback : child_process.spawn avec pipes ─────────────────────────────
       win?.webContents.send('terminal:line', `\x1b[38;5;240m(PTY indisponible — mode pipe)\x1b[0m\r\n`)
-      const child = spawn(cmd, args, {
+      installChild = spawn(cmd, args, {
         env: env as NodeJS.ProcessEnv,
         cwd: os.homedir(),
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['pipe', 'pipe', 'pipe'],
       })
-      child.stdout?.on('data', (d: Buffer) => sendLine(d.toString()))
-      child.stderr?.on('data', (d: Buffer) => sendLine(d.toString()))
-      child.on('close', (code) => onDone(code ?? 1))
-      child.on('error', (err) => {
+      installChild.stdout?.on('data', (d: Buffer) => sendLine(d.toString()))
+      installChild.stderr?.on('data', (d: Buffer) => sendLine(d.toString()))
+      installChild.on('close', (code) => onDone(code ?? 1))
+      installChild.on('error', (err) => {
+        installChild = null
         win?.webContents.send('terminal:line', `\x1b[31m✗ ${err.message}\x1b[0m\r\n`)
         resolve({ success: false, output: err.message })
       })
     })
   })
 
-  // Écrit dans le PTY d'installation (ex : mot de passe sudo)
+  // Écrit dans le PTY ou le child d'installation (ex : mot de passe sudo)
   ipcMain.on('install:write', (_, data: string) => {
-    installPty?.write(data)
+    if (installPty) {
+      installPty.write(data)
+    } else if (installChild?.stdin) {
+      installChild.stdin.write(data)
+    }
+  })
+
+  // ── Sudo pre-auth (lit depuis stdin, pas besoin de TTY) ───────────────────
+  // Utilisé pour pré-authentifier sudo avant de lancer Homebrew.
+  // Le mot de passe est passé en argument (pas dans le cmd, invisible dans ps).
+  ipcMain.handle('install:sudo-preauth', async (_, password: string) => {
+    return new Promise<{ success: boolean; notAdmin: boolean }>((resolve) => {
+      const child = spawn('sudo', ['-S', '-v'], {
+        env: getEnv() as NodeJS.ProcessEnv,
+        cwd: os.homedir(),
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+      let stderr = ''
+      child.stderr?.on('data', (d: Buffer) => { stderr += d.toString() })
+      child.stdin?.write(password + '\n')
+      child.stdin?.end()
+      child.on('close', (code) => {
+        const notAdmin = /not.*sudoer|sudoers|not.*administrator|cannot run/i.test(stderr)
+        resolve({ success: code === 0, notAdmin })
+      })
+      child.on('error', () => resolve({ success: false, notAdmin: false }))
+    })
   })
 
   // ── MCP config ─────────────────────────────────────────────────────────────

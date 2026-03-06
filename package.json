@@ -1,6 +1,6 @@
 {
   "name": "claude-launcher",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Turnkey installer for Claude, Claude Code & MCP on macOS",
   "main": "out/main/index.js",
   "scripts": {

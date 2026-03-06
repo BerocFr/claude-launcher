@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 
 interface Props {
+  message?: string
   onSubmit: (password: string) => void
   onCancel: () => void
 }
 
-export function PasswordModal({ onSubmit, onCancel }: Props) {
+export function PasswordModal({ message, onSubmit, onCancel }: Props) {
   const [password, setPassword] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -30,7 +31,7 @@ export function PasswordModal({ onSubmit, onCancel }: Props) {
           </div>
           <div>
             <div className="text-tx-1 font-semibold text-sm">Mot de passe requis</div>
-            <div className="text-tx-3 text-xs mt-0.5">sudo demande votre mot de passe admin</div>
+            <div className="text-tx-3 text-xs mt-0.5">{message ?? 'sudo demande votre mot de passe admin'}</div>
           </div>
         </div>
 

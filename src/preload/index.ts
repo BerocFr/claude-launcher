@@ -31,10 +31,18 @@ const api = {
     return () => ipcRenderer.removeListener('terminal:password-prompt', handler)
   },
 
+  onNotAdmin: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('terminal:not-admin', handler)
+    return () => ipcRenderer.removeListener('terminal:not-admin', handler)
+  },
+
   // ── Install runner ─────────────────────────────────────────────────────────
   runInstall: (cmd: string, args: string[]) =>
     ipcRenderer.invoke('install:run', cmd, args),
   writeInstall: (data: string) => ipcRenderer.send('install:write', data),
+  sudoPreauth: (password: string) =>
+    ipcRenderer.invoke('install:sudo-preauth', password),
 
   // ── MCP config ─────────────────────────────────────────────────────────────
   readMCPConfig: () => ipcRenderer.invoke('mcp:readConfig'),

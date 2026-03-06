@@ -30,8 +30,10 @@ interface API {
   onTerminalData(id: string, cb: (data: string) => void): () => void
   onTerminalLine(cb: (line: string) => void): () => void
   onPasswordPrompt(cb: () => void): () => void
+  onNotAdmin(cb: () => void): () => void
   runInstall(cmd: string, args: string[]): Promise<InstallResult>
   writeInstall(data: string): void
+  sudoPreauth(password: string): Promise<{ success: boolean; notAdmin: boolean }>
   readMCPConfig(): Promise<MCPConfig>
   writeMCPConfig(config: object): Promise<{ success: boolean; error?: string }>
   openExternal(url: string): Promise<void>
