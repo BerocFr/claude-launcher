@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore, Status } from '../store'
 import { StatusItem } from '../components/StatusItem'
-import { PasswordModal } from '../components/PasswordModal'
 import { api } from '../api'
 import { Loader2 } from 'lucide-react'
 
@@ -63,9 +62,6 @@ export function Prerequisites({ onNext }: Props) {
   const { prereqs } = state
   const [isChecking, setIsChecking] = useState(false)
   const [hasChecked, setHasChecked] = useState(false)
-  // Pre-auth sudo modal (for Homebrew which needs sudo without TTY)
-  const [pendingBrewInstall, setPendingBrewInstall] = useState(false)
-  const [authError, setAuthError] = useState<string | null>(null)
 
   const runChecks = async () => {
     setIsChecking(true)
@@ -95,7 +91,7 @@ export function Prerequisites({ onNext }: Props) {
     runChecks()
   }, [])
 
-  const runInstall = async (key: Prereq) => {
+  const install = async (key: Prereq) => {
     const info = PREREQ_INFO[key]
     if (!info.installCmd) return
 
@@ -119,37 +115,6 @@ export function Prerequisites({ onNext }: Props) {
     }
   }
 
-  const install = (key: Prereq) => {
-    // Homebrew needs sudo — ask for password first, pre-auth, then install
-    if (key === 'brew') {
-      setAuthError(null)
-      setPendingBrewInstall(true)
-      return
-    }
-    runInstall(key)
-  }
-
-  const handleBrewPassword = async (password: string) => {
-    setPendingBrewInstall(false)
-    setAuthError(null)
-    dispatch({ type: 'CLEAR_TERMINAL' })
-
-    // Pre-authenticate sudo (sudo -S reads from stdin, no TTY needed)
-    const auth = await api.sudoPreauth(password)
-    if (!auth.success) {
-      if (auth.notAdmin) {
-        setAuthError('Votre compte macOS n\'est pas administrateur. Allez dans Réglages Système → Utilisateurs et groupes → cochez "Administrer cet ordinateur".')
-      } else {
-        setAuthError('Mot de passe incorrect. Réessayez.')
-        setPendingBrewInstall(true)
-      }
-      return
-    }
-
-    // sudo credentials are now cached — Homebrew will reuse them
-    runInstall('brew')
-  }
-
   const allOk = (['macos', 'xcode', 'brew', 'node', 'git'] as Prereq[]).every(
     (k) => prereqs[k] === 'ok'
   )
@@ -159,13 +124,6 @@ export function Prerequisites({ onNext }: Props) {
 
   return (
     <div className="animate-slide-up">
-      {pendingBrewInstall && (
-        <PasswordModal
-          message="Homebrew nécessite votre mot de passe administrateur macOS"
-          onSubmit={handleBrewPassword}
-          onCancel={() => { setPendingBrewInstall(false); setAuthError(null) }}
-        />
-      )}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xl">🔧</span>
@@ -191,30 +149,12 @@ export function Prerequisites({ onNext }: Props) {
         ))}
       </div>
 
-      {/* Auth error banner */}
-      {authError && (
-        <div className="p-3 rounded-xl bg-[#2A1515] border border-[#EF4444]/40 mb-4">
-          <p className="text-xs text-[#F87171] leading-relaxed">
-            <span className="font-semibold">⛔ {authError}</span>
-          </p>
-          {authError.includes('administrer') && (
-            <button
-              onClick={() => api.openExternal('x-apple.systempreferences:com.apple.preferences.users-groups')}
-              className="mt-2 text-xs text-[#F06A35] underline underline-offset-2"
-            >
-              Ouvrir Réglages Système → Utilisateurs et groupes →
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Info box */}
       <div className="p-3 rounded-xl bg-surface-card border border-edge mb-6">
         <p className="text-xs text-tx-2 leading-relaxed">
           <span className="text-warn">ℹ️</span>{' '}
-          L'installation de Homebrew peut demander votre{' '}
-          <strong className="text-tx-1">mot de passe administrateur</strong>. C'est normal —
-          macOS affichera une fenêtre de confirmation.
+          Homebrew demande votre <strong className="text-tx-1">mot de passe administrateur</strong>.
+          Une fenêtre de saisie apparaîtra dans le terminal — cliquez dessus et tapez votre mot de passe.
         </p>
       </div>
 

@@ -131,20 +131,41 @@ export function registerIpcHandlers(): void {
         installPty = null
       }
 
-      // ── Fallback : child_process.spawn avec pipes ─────────────────────────────
-      win?.webContents.send('terminal:line', `\x1b[38;5;240m(PTY indisponible — mode pipe)\x1b[0m\r\n`)
-      installChild = spawn(cmd, args, {
+      // ── Fallback 1 : /usr/bin/script (PTY système sans node-pty) ────────────
+      // `script -q /dev/null cmd args` crée un vrai PTY pour le processus enfant.
+      // sudo voit un TTY → peut afficher son prompt → notre modal envoie le mdp.
+      win?.webContents.send('terminal:line', `\x1b[38;5;240m(mode script-PTY)\x1b[0m\r\n`)
+      installChild = spawn('/usr/bin/script', ['-q', '/dev/null', cmd, ...args], {
         env: env as NodeJS.ProcessEnv,
         cwd: os.homedir(),
         stdio: ['pipe', 'pipe', 'pipe'],
       })
-      installChild.stdout?.on('data', (d: Buffer) => sendLine(d.toString()))
-      installChild.stderr?.on('data', (d: Buffer) => sendLine(d.toString()))
-      installChild.on('close', (code) => onDone(code ?? 1))
-      installChild.on('error', (err) => {
+      const scriptChild = installChild
+      scriptChild.stdout?.on('data', (d: Buffer) => sendLine(d.toString()))
+      scriptChild.stderr?.on('data', (d: Buffer) => sendLine(d.toString()))
+      scriptChild.on('close', (code) => {
+        if (installChild === scriptChild) onDone(code ?? 1)
+      })
+      scriptChild.on('error', (_err) => {
+        if (installChild !== scriptChild) return
         installChild = null
-        win?.webContents.send('terminal:line', `\x1b[31m✗ ${err.message}\x1b[0m\r\n`)
-        resolve({ success: false, output: err.message })
+
+        // ── Fallback 2 : plain pipe (sans TTY, dernier recours) ──────────────
+        win?.webContents.send('terminal:line', `\x1b[38;5;240m(mode pipe)\x1b[0m\r\n`)
+        const pipeChild = spawn(cmd, args, {
+          env: env as NodeJS.ProcessEnv,
+          cwd: os.homedir(),
+          stdio: ['pipe', 'pipe', 'pipe'],
+        })
+        installChild = pipeChild
+        pipeChild.stdout?.on('data', (d: Buffer) => sendLine(d.toString()))
+        pipeChild.stderr?.on('data', (d: Buffer) => sendLine(d.toString()))
+        pipeChild.on('close', (code) => onDone(code ?? 1))
+        pipeChild.on('error', (err2) => {
+          installChild = null
+          win?.webContents.send('terminal:line', `\x1b[31m✗ ${err2.message}\x1b[0m\r\n`)
+          resolve({ success: false, output: err2.message })
+        })
       })
     })
   })
