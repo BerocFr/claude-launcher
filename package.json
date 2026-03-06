@@ -80,6 +80,9 @@
     "files": [
       "out/**/*"
     ],
+    "asarUnpack": [
+      "**/node_modules/node-pty/**"
+    ],
     "directories": {
       "buildResources": "resources"
     },

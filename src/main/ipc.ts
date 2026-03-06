@@ -73,40 +73,27 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('install:run', async (_event, cmd: string, args: string[]) => {
     return new Promise<{ success: boolean; output: string }>((resolve) => {
       const win = getWin()
-      const env = getEnv()
+      const env = {
+        ...getEnv(),
+        NONINTERACTIVE: '1',
+        HOMEBREW_NO_ANALYTICS: '1',
+        HOMEBREW_NO_AUTO_UPDATE: '1',
+        HOMEBREW_NO_INSTALL_CLEANUP: '1',
+        CI: '1',
+        FORCE_COLOR: '1',
+      }
       let output = ''
 
       const cmdStr = [cmd, ...args].join(' ')
       win?.webContents.send('terminal:line', `\x1b[38;5;244m$ ${cmdStr}\x1b[0m\r\n`)
       win?.webContents.send('terminal:line', `\x1b[38;5;240mDémarrage…\x1b[0m\r\n`)
 
-      try {
-        installPty = pty.spawn(cmd, args, {
-          name: 'xterm-256color',
-          cols: 120,
-          rows: 40,
-          cwd: os.homedir(),
-          env: {
-            ...env,
-            NONINTERACTIVE: '1',
-            HOMEBREW_NO_ANALYTICS: '1',
-            HOMEBREW_NO_AUTO_UPDATE: '1',
-            HOMEBREW_NO_INSTALL_CLEANUP: '1',
-            CI: '1',
-          } as Record<string, string>,
-        })
-      } catch (spawnErr: any) {
-        const msg = `\x1b[31m✗ Impossible de lancer le processus: ${spawnErr?.message ?? spawnErr}\x1b[0m\r\n`
-        win?.webContents.send('terminal:line', msg)
-        return resolve({ success: false, output: spawnErr?.message ?? String(spawnErr) })
-      }
-
-      installPty.onData((data) => {
+      const sendLine = (data: string) => {
         output += data
         win?.webContents.send('terminal:line', data)
-      })
+      }
 
-      installPty.onExit(({ exitCode }) => {
+      const onDone = (exitCode: number) => {
         installPty = null
         const ok = exitCode === 0
         const msg = ok
@@ -114,6 +101,37 @@ export function registerIpcHandlers(): void {
           : `\x1b[31m✗ Erreur (code ${exitCode})\x1b[0m\r\n`
         win?.webContents.send('terminal:line', '\r\n' + msg)
         resolve({ success: ok, output })
+      }
+
+      // ── Tentative 1 : node-pty (vrai TTY, meilleure UX) ──────────────────────
+      try {
+        installPty = pty.spawn(cmd, args, {
+          name: 'xterm-256color',
+          cols: 120,
+          rows: 40,
+          cwd: os.homedir(),
+          env: env as Record<string, string>,
+        })
+        installPty.onData(sendLine)
+        installPty.onExit(({ exitCode }) => onDone(exitCode))
+        return // PTY OK, on sort
+      } catch {
+        installPty = null
+      }
+
+      // ── Fallback : child_process.spawn avec pipes ─────────────────────────────
+      win?.webContents.send('terminal:line', `\x1b[38;5;240m(PTY indisponible — mode pipe)\x1b[0m\r\n`)
+      const child = spawn(cmd, args, {
+        env: env as NodeJS.ProcessEnv,
+        cwd: os.homedir(),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      child.stdout?.on('data', (d: Buffer) => sendLine(d.toString()))
+      child.stderr?.on('data', (d: Buffer) => sendLine(d.toString()))
+      child.on('close', (code) => onDone(code ?? 1))
+      child.on('error', (err) => {
+        win?.webContents.send('terminal:line', `\x1b[31m✗ ${err.message}\x1b[0m\r\n`)
+        resolve({ success: false, output: err.message })
       })
     })
   })
