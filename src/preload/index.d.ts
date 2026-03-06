@@ -36,6 +36,7 @@ interface API {
   runInstall(cmd: string, args: string[]): Promise<InstallResult>
   writeInstall(data: string): void
   sudoPreauth(password: string): Promise<{ success: boolean; notAdmin: boolean }>
+  setupBrewPath(): Promise<{ success: boolean; brewBin: string; profiles: string[] }>
   readMCPConfig(): Promise<MCPConfig>
   writeMCPConfig(config: object): Promise<{ success: boolean; error?: string }>
   openExternal(url: string): Promise<void>

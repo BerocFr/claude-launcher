@@ -12,6 +12,7 @@ import {
   checkGit,
   checkClaudeCode,
   checkIsAdmin,
+  setupBrewPath,
   verifyApiKey,
   getEnv,
 } from './system'
@@ -249,6 +250,25 @@ export function registerIpcHandlers(): void {
       })
       child.on('error', () => resolve({ success: false, notAdmin: false }))
     })
+  })
+
+  // ── Post-install Homebrew PATH setup ───────────────────────────────────────
+  // Écrit la ligne `eval "$(brew shellenv)"` dans ~/.zprofile et ~/.bash_profile
+  // via Node.js fs (pas de bash, pas de problème d'échappement).
+  ipcMain.handle('install:setup-brew-path', () => {
+    const win = getWin()
+    const result = setupBrewPath()
+    if (result.success) {
+      const profiles = result.profiles.length > 0
+        ? result.profiles.join(' et ')
+        : 'déjà configuré'
+      win?.webContents.send('terminal:line',
+        `\x1b[32m✓ Homebrew PATH ajouté à ${profiles}\x1b[0m\r\n`)
+    } else {
+      win?.webContents.send('terminal:line',
+        `\x1b[33m⚠ brew introuvable pour la config PATH\x1b[0m\r\n`)
+    }
+    return result
   })
 
   // ── MCP config ─────────────────────────────────────────────────────────────

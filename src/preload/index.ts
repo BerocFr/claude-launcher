@@ -45,6 +45,7 @@ const api = {
   writeInstall: (data: string) => ipcRenderer.send('install:write', data),
   sudoPreauth: (password: string) =>
     ipcRenderer.invoke('install:sudo-preauth', password),
+  setupBrewPath: () => ipcRenderer.invoke('install:setup-brew-path'),
 
   // ── MCP config ─────────────────────────────────────────────────────────────
   readMCPConfig: () => ipcRenderer.invoke('mcp:readConfig'),

@@ -1,6 +1,8 @@
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import * as os from 'os'
+import * as fs from 'fs'
+import * as path from 'path'
 import * as https from 'https'
 
 const execAsync = promisify(execFile)
@@ -89,6 +91,38 @@ export async function checkGit(): Promise<CheckResult> {
     return { installed: true, version: r.stdout.replace('git version ', '') }
   }
   return { installed: false }
+}
+
+/**
+ * Configure le PATH Homebrew dans les profils shell de l'utilisateur.
+ * Écrit la ligne `eval "$(brew shellenv)"` dans ~/.zprofile et ~/.bash_profile
+ * si elle n'est pas déjà présente. Utilise Node.js fs directement pour éviter
+ * les problèmes d'échappement bash.
+ */
+export function setupBrewPath(): { success: boolean; brewBin: string; profiles: string[] } {
+  const brewBins = ['/opt/homebrew/bin/brew', '/usr/local/bin/brew']
+  const brewBin = brewBins.find((b) => fs.existsSync(b)) ?? ''
+
+  if (!brewBin) return { success: false, brewBin: '', profiles: [] }
+
+  const evalLine = `eval "$(${brewBin} shellenv)"`
+  const profilePaths = [
+    path.join(os.homedir(), '.zprofile'),
+    path.join(os.homedir(), '.bash_profile'),
+  ]
+  const configured: string[] = []
+
+  for (const profilePath of profilePaths) {
+    try {
+      const existing = fs.existsSync(profilePath) ? fs.readFileSync(profilePath, 'utf-8') : ''
+      if (!existing.includes('brew shellenv')) {
+        fs.appendFileSync(profilePath, `\n# Homebrew\n${evalLine}\n`, 'utf-8')
+        configured.push(path.basename(profilePath))
+      }
+    } catch { /* ignore */ }
+  }
+
+  return { success: true, brewBin, profiles: configured }
 }
 
 export async function checkClaudeCode(): Promise<CheckResult> {

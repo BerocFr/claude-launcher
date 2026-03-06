@@ -28,6 +28,7 @@ const fallback: Window['api'] = {
   runInstall:       () => Promise.resolve({ success: false, output: '' }),
   writeInstall:     noop,
   sudoPreauth:      () => Promise.resolve({ success: false, notAdmin: false }),
+  setupBrewPath:    () => Promise.resolve({ success: false, brewBin: '', profiles: [] }),
   readMCPConfig:    () => Promise.resolve({ mcpServers: {} }),
   writeMCPConfig:   () => Promise.resolve({ success: true }),
   openExternal:     noopPromise,

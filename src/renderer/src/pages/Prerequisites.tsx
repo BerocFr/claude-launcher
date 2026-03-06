@@ -132,6 +132,11 @@ export function Prerequisites({ onNext }: Props) {
     const result = await api.runInstall(cmd, args)
 
     if (result.success) {
+      // Après une install Homebrew réussie, configure automatiquement le PATH
+      // dans ~/.zprofile et ~/.bash_profile (équivalent des "Next steps" affichés par brew)
+      if (key === 'brew') {
+        await api.setupBrewPath()
+      }
       const checks = await api.checkAll()
       const r = checks[key]
       dispatch({
