@@ -27,6 +27,7 @@ const fallback: Window['api'] = {
   onPasswordPrompt: () => noop,
   onNotAdmin:                () => noop,
   onBrewNextStepsDetected:   () => noop,
+  onBrewLinkNeeded:          () => noop,
   runInstall:       () => Promise.resolve({ success: false, output: '' }),
   writeInstall:     noop,
   sudoPreauth:      () => Promise.resolve({ success: false, notAdmin: false }),

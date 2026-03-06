@@ -46,6 +46,12 @@ const api = {
     return () => ipcRenderer.removeListener('terminal:brew-next-steps', handler)
   },
 
+  onBrewLinkNeeded: (cb: (pkg: string) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, pkg: string) => cb(pkg)
+    ipcRenderer.on('terminal:brew-link-needed', handler)
+    return () => ipcRenderer.removeListener('terminal:brew-link-needed', handler)
+  },
+
   // ── Install runner ─────────────────────────────────────────────────────────
   runInstall: (cmd: string, args: string[]) =>
     ipcRenderer.invoke('install:run', cmd, args),

@@ -113,6 +113,7 @@ export function registerIpcHandlers(): void {
         FORCE_COLOR: '1',
       }
       let output = ''
+      let brewLinkEmitted = false
 
       const cmdStr = [cmd, ...args].join(' ')
       win?.webContents.send('terminal:line', `\x1b[38;5;244m$ ${cmdStr}\x1b[0m\r\n`)
@@ -134,6 +135,14 @@ export function registerIpcHandlers(): void {
         // (le process brew peut rester actif encore un peu après)
         if (/next steps?:/i.test(data)) {
           win?.webContents.send('terminal:brew-next-steps')
+        }
+        // Detect "brew link --overwrite <pkg>" suggestion → affiche la modal d'action
+        if (!brewLinkEmitted) {
+          const m = data.match(/brew link --overwrite (\S+)/)
+          if (m) {
+            brewLinkEmitted = true
+            win?.webContents.send('terminal:brew-link-needed', m[1])
+          }
         }
       }
 

@@ -5,6 +5,7 @@ import { StepNav } from './components/StepNav'
 import { TerminalPanel } from './components/Terminal'
 import { PasswordModal } from './components/PasswordModal'
 import { BrewNextStepsModal } from './components/BrewNextStepsModal'
+import { BrewLinkModal } from './components/BrewLinkModal'
 import { Welcome } from './pages/Welcome'
 import { Prerequisites } from './pages/Prerequisites'
 import { ClaudeSetup } from './pages/ClaudeSetup'
@@ -17,6 +18,7 @@ function Inner() {
   const { step, terminalLines, prereqs, claudeCode, mcp } = state
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [brewNextStepsBin, setBrewNextStepsBin] = useState<string | null>(null)
+  const [brewLinkPkg, setBrewLinkPkg] = useState<string | null>(null)
 
   // Listen for terminal output from guided installs
   useEffect(() => {
@@ -40,6 +42,12 @@ function Inner() {
       const brewBin = arch === 'arm64' ? '/opt/homebrew/bin/brew' : '/usr/local/bin/brew'
       setBrewNextStepsBin(brewBin)
     })
+    return remove
+  }, [])
+
+  // Show brew link modal when "brew link --overwrite <pkg>" is detected
+  useEffect(() => {
+    const remove = api.onBrewLinkNeeded((pkg) => setBrewLinkPkg(pkg))
     return remove
   }, [])
 
@@ -92,6 +100,28 @@ function Inner() {
               version: r.version,
               error: r.error,
             })
+          }}
+        />
+      )}
+      {brewLinkPkg && (
+        <BrewLinkModal
+          pkg={brewLinkPkg}
+          onContinue={async () => {
+            const pkg = brewLinkPkg
+            setBrewLinkPkg(null)
+            dispatch({ type: 'CLEAR_TERMINAL' })
+            await api.runInstall('/bin/bash', ['-c', `brew link --overwrite ${pkg}`])
+            const checks = await api.checkAll()
+            const key = pkg as 'node' | 'git'
+            const r = checks[key]
+            if (r) {
+              dispatch({
+                type: 'SET_PREREQ_STATUS', key,
+                status: r.installed ? 'ok' : 'error',
+                version: r.version,
+                error: r.error,
+              })
+            }
           }}
         />
       )}
