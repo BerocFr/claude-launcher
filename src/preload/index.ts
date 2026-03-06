@@ -7,6 +7,7 @@ const api = {
   checkClaudeCode: () => ipcRenderer.invoke('system:checkClaudeCode'),
   checkAdmin: () => ipcRenderer.invoke('system:checkAdmin'),
   makeAdmin: () => ipcRenderer.invoke('install:make-admin'),
+  getArch: () => ipcRenderer.invoke('system:arch'),
 
   // ── Terminal PTY ────────────────────────────────────────────────────────────
   createTerminal: (id: string) => ipcRenderer.invoke('terminal:create', id),

@@ -16,6 +16,7 @@ interface MCPConfig {
 }
 
 interface API {
+  getArch(): Promise<string>
   checkAll(): Promise<{
     macos: CheckResult
     xcode: CheckResult

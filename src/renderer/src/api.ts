@@ -7,6 +7,7 @@ const noop = () => {}
 const noopPromise = () => Promise.resolve() as any
 
 const fallback: Window['api'] = {
+  getArch: () => Promise.resolve('arm64'),
   checkAll: () =>
     Promise.resolve({
       macos:  { installed: false, error: 'Hors Electron' },

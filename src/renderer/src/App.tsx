@@ -4,6 +4,7 @@ import { api } from './api'
 import { StepNav } from './components/StepNav'
 import { TerminalPanel } from './components/Terminal'
 import { PasswordModal } from './components/PasswordModal'
+import { BrewNextStepsModal } from './components/BrewNextStepsModal'
 import { Welcome } from './pages/Welcome'
 import { Prerequisites } from './pages/Prerequisites'
 import { ClaudeSetup } from './pages/ClaudeSetup'
@@ -15,6 +16,7 @@ function Inner() {
   const { state, dispatch } = useStore()
   const { step, terminalLines, prereqs, claudeCode, mcp } = state
   const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [brewNextStepsBin, setBrewNextStepsBin] = useState<string | null>(null)
 
   // Listen for terminal output from guided installs
   useEffect(() => {
@@ -41,7 +43,7 @@ function Inner() {
   const renderPage = () => {
     switch (step) {
       case 'welcome':      return <Welcome onNext={() => goTo('prerequisites')} />
-      case 'prerequisites': return <Prerequisites onNext={() => goTo('claude')} />
+      case 'prerequisites': return <Prerequisites onNext={() => goTo('claude')} onBrewNextSteps={setBrewNextStepsBin} />
       case 'claude':       return <ClaudeSetup onNext={() => goTo('claudecode')} />
       case 'claudecode':   return <ClaudeCodeSetup onNext={() => goTo('mcp')} />
       case 'mcp':          return <MCPSetup onNext={() => goTo('complete')} />
@@ -62,6 +64,23 @@ function Inner() {
           onCancel={() => {
             api.writeInstall('\x03')
             setShowPasswordModal(false)
+          }}
+        />
+      )}
+      {brewNextStepsBin && (
+        <BrewNextStepsModal
+          brewBin={brewNextStepsBin}
+          onContinue={async () => {
+            setBrewNextStepsBin(null)
+            // Vérifie que brew est bien installé et met à jour le statut
+            const checks = await api.checkAll()
+            const r = checks.brew
+            dispatch({
+              type: 'SET_PREREQ_STATUS', key: 'brew',
+              status: r.installed ? 'ok' : 'error',
+              version: r.version,
+              error: r.error,
+            })
           }}
         />
       )}

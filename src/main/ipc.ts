@@ -252,6 +252,9 @@ export function registerIpcHandlers(): void {
     })
   })
 
+  // ── Architecture du process hôte ────────────────────────────────────────────
+  ipcMain.handle('system:arch', () => process.arch)
+
   // ── Post-install Homebrew PATH setup ───────────────────────────────────────
   // Écrit la ligne `eval "$(brew shellenv)"` dans ~/.zprofile et ~/.bash_profile
   // via Node.js fs (pas de bash, pas de problème d'échappement).
