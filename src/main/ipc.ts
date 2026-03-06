@@ -137,11 +137,16 @@ export function registerIpcHandlers(): void {
           win?.webContents.send('terminal:brew-next-steps')
         }
         // Detect "brew link --overwrite <pkg>" suggestion → affiche la modal d'action
+        // et tue le process courant (il a échoué à la phase link, inutile de continuer)
         if (!brewLinkEmitted) {
           const m = data.match(/brew link --overwrite (\S+)/)
           if (m) {
             brewLinkEmitted = true
             win?.webContents.send('terminal:brew-link-needed', m[1])
+            setTimeout(() => {
+              installPty?.kill()
+              if (installChild?.pid) installChild.kill('SIGTERM')
+            }, 300)
           }
         }
       }

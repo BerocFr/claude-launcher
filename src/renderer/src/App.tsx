@@ -110,7 +110,7 @@ function Inner() {
             const pkg = brewLinkPkg
             setBrewLinkPkg(null)
             dispatch({ type: 'CLEAR_TERMINAL' })
-            await api.runInstall('/bin/bash', ['-c', `brew link --overwrite ${pkg}`])
+            await api.runInstall('/bin/bash', ['-c', `sudo brew link --overwrite ${pkg}`])
             const checks = await api.checkAll()
             const key = pkg as 'node' | 'git'
             const r = checks[key]
