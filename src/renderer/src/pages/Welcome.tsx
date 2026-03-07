@@ -3,7 +3,7 @@ interface Props {
 }
 
 const STEPS = [
-  { icon: '🔧', title: 'Prérequis', desc: 'Homebrew, Node.js, Git' },
+  { icon: '⚡', title: 'Prérequis', desc: 'Node.js via NVM (sans sudo)' },
   { icon: '🤖', title: 'Claude', desc: 'Compte, plan & configuration' },
   { icon: '⌨️', title: 'Claude Code', desc: 'CLI & permissions' },
   { icon: '🔌', title: 'MCP', desc: 'Outils & extensions' },

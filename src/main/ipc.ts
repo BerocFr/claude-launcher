@@ -100,6 +100,7 @@ export function registerIpcHandlers(): void {
         FORCE_COLOR: '1',
       }
       let output = ''
+      let nvmDone = false  // true quand NVM a fini (même si le PTY reste ouvert)
 
       const cmdStr = [cmd, ...args].join(' ')
       win?.webContents.send('terminal:line', `\x1b[38;5;244m$ ${cmdStr}\x1b[0m\r\n`)
@@ -117,16 +118,23 @@ export function registerIpcHandlers(): void {
         if (/needs to be an Administrator/i.test(data) || /not.*administrator/i.test(data)) {
           win?.webContents.send('terminal:not-admin')
         }
-        // Après install NVM, met à jour PATH du process principal
-        if (/nvm install|now using node/i.test(data)) {
+        // Detect NVM completion : "creating default alias" est la dernière ligne
+        // que NVM affiche après install. Le PTY peut rester ouvert — on le tue.
+        if (!nvmDone && /creating default alias/i.test(data)) {
+          nvmDone = true
           setupNvmPath()
+          setTimeout(() => {
+            installPty?.kill()
+            if (installChild?.pid) installChild.kill('SIGTERM')
+          }, 800)
         }
       }
 
       const onDone = (exitCode: number) => {
         installPty = null
         installChild = null
-        const ok = exitCode === 0
+        // Si NVM a signalé sa complétion, c'est un succès même si on a tué le PTY
+        const ok = nvmDone || exitCode === 0
         const msg = ok
           ? `\x1b[32m✓ Terminé\x1b[0m\r\n`
           : `\x1b[31m✗ Erreur (code ${exitCode})\x1b[0m\r\n`
