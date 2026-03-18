@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { PLANS } from '../data/plans'
 import { api } from '../api'
+import { StatusItem } from '../components/StatusItem'
 import { ExternalLink, CheckCircle2, AlertTriangle } from 'lucide-react'
+import type { Status } from '../store'
 
 interface Props {
   onNext: () => void
@@ -15,21 +17,57 @@ const COLOR_MAP = {
   blue:   { card: 'border-brand-blue/30 bg-brand-blue-dim',         badge: 'bg-brand-blue text-white'     },
 }
 
+const CLAUDE_APP_CMD = '/bin/bash'
+const CLAUDE_APP_ARGS = ['-c', [
+  'DMG_URL="https://storage.googleapis.com/osprey-downloads-c02f6a0d-347c-492b-a752-3e0651722e97/nest-apple/Claude.dmg"',
+  'echo "Téléchargement de Claude..."',
+  'curl -fL "$DMG_URL" --progress-bar -o /tmp/Claude-install.dmg 2>&1',
+  'if [ $? -ne 0 ]; then echo "Erreur téléchargement"; exit 1; fi',
+  'echo "Montage..."',
+  'VOLUME=$(hdiutil attach /tmp/Claude-install.dmg -nobrowse -quiet | awk \'{print $NF}\' | tail -1)',
+  'if [ -z "$VOLUME" ]; then echo "Erreur montage"; exit 1; fi',
+  'mkdir -p ~/Applications',
+  'echo "Installation de Claude.app..."',
+  'cp -Rf "$VOLUME/Claude.app" ~/Applications/',
+  'hdiutil detach "$VOLUME" -quiet 2>/dev/null',
+  'rm -f /tmp/Claude-install.dmg',
+  'echo "==>claude-app-done"',
+].join('; ')]
+
 export function ClaudeSetup({ onNext }: Props) {
   const { state, dispatch } = useStore()
   const { claude } = state
   const [connected, setConnected] = useState(false)
+  const [claudeAppStatus, setClaudeAppStatus] = useState<Status>('idle')
+
+  useEffect(() => {
+    setClaudeAppStatus('checking')
+    api.checkClaudeApp()
+      .then((r) => setClaudeAppStatus(r.installed ? 'ok' : 'error'))
+      .catch(() => setClaudeAppStatus('error'))
+  }, [])
 
   const openClaude = () => {
     api.openExternal('https://claude.ai/login')
     setConnected(true)
   }
 
+  const installClaudeApp = async () => {
+    setClaudeAppStatus('installing')
+    dispatch({ type: 'CLEAR_TERMINAL' })
+    const result = await api.runInstall(CLAUDE_APP_CMD, CLAUDE_APP_ARGS)
+    if (result.success) {
+      const check = await api.checkClaudeApp()
+      setClaudeAppStatus(check.installed ? 'ok' : 'error')
+    } else {
+      setClaudeAppStatus('error')
+    }
+  }
+
   const canContinue = claude.plan !== null && claude.plan !== 'free' && connected
 
   return (
     <div className="animate-slide-up">
-      {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xl">🤖</span>
@@ -40,7 +78,6 @@ export function ClaudeSetup({ onNext }: Props) {
         </p>
       </div>
 
-      {/* Plan selector */}
       <p className="text-xs font-semibold text-tx-3 uppercase tracking-wider mb-3">
         Quel est votre plan ?
       </p>
@@ -48,7 +85,6 @@ export function ClaudeSetup({ onNext }: Props) {
         {PLANS.map((plan) => {
           const colors = COLOR_MAP[plan.color]
           const isSelected = claude.plan === plan.id
-
           return (
             <button
               key={plan.id}
@@ -83,7 +119,6 @@ export function ClaudeSetup({ onNext }: Props) {
         })}
       </div>
 
-      {/* Free plan warning */}
       {claude.plan === 'free' && (
         <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-danger/20 bg-danger-dim mb-5 animate-fade-in">
           <AlertTriangle size={15} className="text-danger flex-shrink-0 mt-0.5" />
@@ -94,7 +129,6 @@ export function ClaudeSetup({ onNext }: Props) {
         </div>
       )}
 
-      {/* Connect block */}
       {claude.plan && claude.plan !== 'free' && (
         <div className={`p-4 rounded-xl border transition-all mb-5 animate-fade-in ${
           connected ? 'border-ok/25 bg-ok-dim' : 'border-edge bg-surface-card'
@@ -115,7 +149,6 @@ export function ClaudeSetup({ onNext }: Props) {
               <p className="text-xs text-tx-2 mb-3 leading-relaxed">
                 Cliquez pour ouvrir claude.ai et vous connecter avec votre compte{' '}
                 <strong className="text-tx-1">{PLANS.find(p => p.id === claude.plan)?.name}</strong>.
-                C'est tout ce dont Claude Code a besoin.
               </p>
               <button
                 onClick={openClaude}
@@ -129,7 +162,29 @@ export function ClaudeSetup({ onNext }: Props) {
         </div>
       )}
 
-      {/* Continue */}
+      {/* App Claude officielle */}
+      <div className="mb-5">
+        <p className="text-xs font-semibold text-tx-3 uppercase tracking-wider mb-3">
+          App Claude (recommandé)
+        </p>
+        <StatusItem
+          label="Claude pour macOS"
+          description="Application desktop officielle — conversations, artefacts, projets"
+          status={claudeAppStatus}
+          onInstall={claudeAppStatus === 'error' ? installClaudeApp : undefined}
+          installLabel="Installer"
+        />
+        {claudeAppStatus === 'error' && (
+          <button
+            onClick={() => api.openExternal('https://claude.ai/download')}
+            className="no-drag mt-2 flex items-center gap-1.5 text-xs text-tx-3 hover:text-tx-2 transition-colors"
+          >
+            <ExternalLink size={11} />
+            Télécharger manuellement depuis claude.ai/download
+          </button>
+        )}
+      </div>
+
       <button
         onClick={onNext}
         disabled={!canContinue}

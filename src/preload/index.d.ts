@@ -20,6 +20,7 @@ interface API {
     macos: CheckResult
     node: CheckResult
   }>
+  checkClaudeApp(): Promise<CheckResult>
   checkClaudeCode(): Promise<CheckResult>
   checkAdmin(): Promise<{ isAdmin: boolean }>
   makeAdmin(): Promise<{ success: boolean; error?: string }>

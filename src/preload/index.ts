@@ -4,6 +4,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   // ── System checks ──────────────────────────────────────────────────────────
   checkAll: () => ipcRenderer.invoke('system:checkAll'),
+  checkClaudeApp: () => ipcRenderer.invoke('system:checkClaudeApp'),
   checkClaudeCode: () => ipcRenderer.invoke('system:checkClaudeCode'),
   checkAdmin: () => ipcRenderer.invoke('system:checkAdmin'),
   makeAdmin: () => ipcRenderer.invoke('install:make-admin'),

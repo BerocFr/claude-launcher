@@ -12,6 +12,7 @@ const fallback: Window['api'] = {
       macos: { installed: false, error: 'Hors Electron' },
       node:  { installed: false },
     }),
+  checkClaudeApp:   () => Promise.resolve({ installed: false }),
   checkClaudeCode:  () => Promise.resolve({ installed: false }),
   checkAdmin:       () => Promise.resolve({ isAdmin: false }),
   makeAdmin:        () => Promise.resolve({ success: false, error: 'Hors Electron' }),

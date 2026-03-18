@@ -7,6 +7,7 @@ import * as os from 'os'
 import {
   checkMacOS,
   checkNode,
+  checkClaudeApp,
   checkClaudeCode,
   checkIsAdmin,
   setupNvmPath,
@@ -29,6 +30,7 @@ export function registerIpcHandlers(): void {
     return { macos, node }
   })
 
+  ipcMain.handle('system:checkClaudeApp', async () => checkClaudeApp())
   ipcMain.handle('system:checkClaudeCode', async () => checkClaudeCode())
 
   ipcMain.handle('system:verifyApiKey', async (_, key: string) => verifyApiKey(key))
@@ -100,7 +102,9 @@ export function registerIpcHandlers(): void {
         FORCE_COLOR: '1',
       }
       let output = ''
-      let nvmDone = false  // true quand NVM a fini (même si le PTY reste ouvert)
+      let nvmDone = false       // "creating default alias" → NVM terminé
+      let npmDone = false       // "added X packages"       → npm install -g terminé
+      let claudeAppDone = false // "==>claude-app-done"     → install Claude.app terminé
 
       const cmdStr = [cmd, ...args].join(' ')
       win?.webContents.send('terminal:line', `\x1b[38;5;244m$ ${cmdStr}\x1b[0m\r\n`)
@@ -118,23 +122,28 @@ export function registerIpcHandlers(): void {
         if (/needs to be an Administrator/i.test(data) || /not.*administrator/i.test(data)) {
           win?.webContents.send('terminal:not-admin')
         }
-        // Detect NVM completion : "creating default alias" est la dernière ligne
-        // que NVM affiche après install. Le PTY peut rester ouvert — on le tue.
+        // NVM : "creating default alias" = dernière ligne affichée
         if (!nvmDone && /creating default alias/i.test(data)) {
           nvmDone = true
           setupNvmPath()
-          setTimeout(() => {
-            installPty?.kill()
-            if (installChild?.pid) installChild.kill('SIGTERM')
-          }, 800)
+          setTimeout(() => { installPty?.kill(); installChild?.kill?.('SIGTERM') }, 800)
+        }
+        // npm install -g : "added X packages" = fin de l'installation
+        if (!npmDone && /added \d+ packages?/i.test(data)) {
+          npmDone = true
+          setTimeout(() => { installPty?.kill(); installChild?.kill?.('SIGTERM') }, 1000)
+        }
+        // Claude.app : marqueur de fin injecté dans le script bash
+        if (!claudeAppDone && /==>claude-app-done/i.test(data)) {
+          claudeAppDone = true
+          setTimeout(() => { installPty?.kill(); installChild?.kill?.('SIGTERM') }, 500)
         }
       }
 
       const onDone = (exitCode: number) => {
         installPty = null
         installChild = null
-        // Si NVM a signalé sa complétion, c'est un succès même si on a tué le PTY
-        const ok = nvmDone || exitCode === 0
+        const ok = nvmDone || npmDone || claudeAppDone || exitCode === 0
         const msg = ok
           ? `\x1b[32m✓ Terminé\x1b[0m\r\n`
           : `\x1b[31m✗ Erreur (code ${exitCode})\x1b[0m\r\n`

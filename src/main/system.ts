@@ -130,6 +130,18 @@ export async function checkNode(): Promise<CheckResult> {
   return { installed: false }
 }
 
+/** Vérifie si l'app Claude desktop est installée (/Applications ou ~/Applications) */
+export async function checkClaudeApp(): Promise<CheckResult> {
+  const candidates = [
+    '/Applications/Claude.app',
+    path.join(os.homedir(), 'Applications', 'Claude.app'),
+  ]
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return { installed: true }
+  }
+  return { installed: false }
+}
+
 export async function checkClaudeCode(): Promise<CheckResult> {
   const r = await run('claude', ['--version'])
   if (r.code === 0) return { installed: true, version: r.stdout }
