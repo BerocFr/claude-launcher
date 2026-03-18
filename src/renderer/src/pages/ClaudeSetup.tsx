@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { PLANS } from '../data/plans'
 import { api } from '../api'
 import { StatusItem } from '../components/StatusItem'
-import { ExternalLink, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { ExternalLink, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react'
 import type { Status } from '../store'
 
 interface Props {
@@ -17,22 +17,6 @@ const COLOR_MAP = {
   blue:   { card: 'border-brand-blue/30 bg-brand-blue-dim',         badge: 'bg-brand-blue text-white'     },
 }
 
-const CLAUDE_APP_CMD = '/bin/bash'
-const CLAUDE_APP_ARGS = ['-c', [
-  'DMG_URL="https://storage.googleapis.com/osprey-downloads-c02f6a0d-347c-492b-a752-3e0651722e97/nest-apple/Claude.dmg"',
-  'echo "Téléchargement de Claude..."',
-  'curl -fL "$DMG_URL" --progress-bar -o /tmp/Claude-install.dmg 2>&1',
-  'if [ $? -ne 0 ]; then echo "Erreur téléchargement"; exit 1; fi',
-  'echo "Montage..."',
-  'VOLUME=$(hdiutil attach /tmp/Claude-install.dmg -nobrowse -quiet | awk \'{print $NF}\' | tail -1)',
-  'if [ -z "$VOLUME" ]; then echo "Erreur montage"; exit 1; fi',
-  'mkdir -p ~/Applications',
-  'echo "Installation de Claude.app..."',
-  'cp -Rf "$VOLUME/Claude.app" ~/Applications/',
-  'hdiutil detach "$VOLUME" -quiet 2>/dev/null',
-  'rm -f /tmp/Claude-install.dmg',
-  'echo "==>claude-app-done"',
-].join('; ')]
 
 export function ClaudeSetup({ onNext }: Props) {
   const { state, dispatch } = useStore()
@@ -52,16 +36,15 @@ export function ClaudeSetup({ onNext }: Props) {
     setConnected(true)
   }
 
-  const installClaudeApp = async () => {
-    setClaudeAppStatus('installing')
-    dispatch({ type: 'CLEAR_TERMINAL' })
-    const result = await api.runInstall(CLAUDE_APP_CMD, CLAUDE_APP_ARGS)
-    if (result.success) {
-      const check = await api.checkClaudeApp()
-      setClaudeAppStatus(check.installed ? 'ok' : 'error')
-    } else {
-      setClaudeAppStatus('error')
-    }
+  const openClaudeDownload = () => {
+    api.openExternal('https://claude.ai/download')
+  }
+
+  const recheckClaudeApp = () => {
+    setClaudeAppStatus('checking')
+    api.checkClaudeApp()
+      .then((r) => setClaudeAppStatus(r.installed ? 'ok' : 'error'))
+      .catch(() => setClaudeAppStatus('error'))
   }
 
   const canContinue = claude.plan !== null && claude.plan !== 'free' && connected
@@ -171,16 +154,16 @@ export function ClaudeSetup({ onNext }: Props) {
           label="Claude pour macOS"
           description="Application desktop officielle — conversations, artefacts, projets"
           status={claudeAppStatus}
-          onInstall={claudeAppStatus === 'error' ? installClaudeApp : undefined}
-          installLabel="Installer"
+          onInstall={claudeAppStatus === 'error' ? openClaudeDownload : undefined}
+          installLabel="Télécharger"
         />
         {claudeAppStatus === 'error' && (
           <button
-            onClick={() => api.openExternal('https://claude.ai/download')}
+            onClick={recheckClaudeApp}
             className="no-drag mt-2 flex items-center gap-1.5 text-xs text-tx-3 hover:text-tx-2 transition-colors"
           >
-            <ExternalLink size={11} />
-            Télécharger manuellement depuis claude.ai/download
+            <RefreshCw size={11} />
+            Revérifier l'installation
           </button>
         )}
       </div>
