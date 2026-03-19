@@ -76,7 +76,7 @@ async function maybeInstallToApplications(): Promise<void> {
         : 'Installer Claude Launcher dans Applications ?',
       detail:
         (alreadyInstalled ? '' : '• Copie dans /Applications\n') +
-        '• Supprime définitivement le blocage Gatekeeper\n\nVotre mot de passe macOS sera demandé.',
+        '• Supprime définitivement le blocage Gatekeeper',
       buttons: ['Plus tard', 'Installer'],
       defaultId: 1,
       cancelId: 0,
@@ -84,10 +84,35 @@ async function maybeInstallToApplications(): Promise<void> {
 
     if (response === 0) return
 
+    // ── Tentative sans mot de passe (compte admin macOS standard) ──────────
+    // cp -Rf fonctionne si l'user a les droits sur /Applications (admin = oui)
+    // xattr -rd fonctionne car l'user devient owner du fichier copié
+    let doneWithoutAdmin = false
+
+    if (!alreadyInstalled) {
+      try {
+        execSync(`cp -Rf "${appBundlePath}" /Applications/`, { stdio: 'pipe' })
+        doneWithoutAdmin = true
+      } catch {
+        // Utilisateur standard → /Applications non accessible sans sudo → fallback
+      }
+    } else {
+      doneWithoutAdmin = true // Déjà là, pas besoin de copier
+    }
+
+    if (doneWithoutAdmin) {
+      stripQuarantine(destPath) // sans sudo, user = owner
+      if (!alreadyInstalled) {
+        const relativeExe = exePath.slice(appBundlePath.length)
+        app.relaunch({ execPath: destPath + relativeExe })
+        app.quit()
+      }
+      return
+    }
+
+    // ── Fallback : utilisateur standard → mot de passe admin requis ────────
     const tmp = `/tmp/cl_install_${Date.now()}.sh`
-    const lines = ['#!/bin/bash']
-    if (!alreadyInstalled) lines.push(`cp -Rf "${appBundlePath}" /Applications/`)
-    lines.push(`xattr -rd com.apple.quarantine "${destPath}"`)
+    const lines = ['#!/bin/bash', `cp -Rf "${appBundlePath}" /Applications/`, `xattr -rd com.apple.quarantine "${destPath}"`]
     writeFileSync(tmp, lines.join('\n'))
     chmodSync(tmp, 0o755)
 
@@ -99,11 +124,9 @@ async function maybeInstallToApplications(): Promise<void> {
     }
     unlinkSync(tmp)
 
-    if (!alreadyInstalled) {
-      const relativeExe = exePath.slice(appBundlePath.length)
-      app.relaunch({ execPath: destPath + relativeExe })
-      app.quit()
-    }
+    const relativeExe = exePath.slice(appBundlePath.length)
+    app.relaunch({ execPath: destPath + relativeExe })
+    app.quit()
     return
   }
 
