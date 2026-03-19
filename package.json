@@ -60,7 +60,7 @@
       "sign": false,
       "window": {
         "width": 540,
-        "height": 380
+        "height": 480
       },
       "iconSize": 80,
       "contents": [
@@ -74,6 +74,13 @@
           "y": 185,
           "type": "link",
           "path": "/Applications"
+        },
+        {
+          "x": 270,
+          "y": 360,
+          "type": "file",
+          "path": "scripts/Installer.command",
+          "name": "📦 Installer Claude Launcher.command"
         }
       ]
     },
