@@ -24,7 +24,7 @@ exports.default = async function (context) {
 
   try {
     execSync(
-      `codesign --sign - --deep --force --preserve-metadata=entitlements,identifier,flags "${appPath}"`,
+      `codesign --sign - --deep --force "${appPath}"`,
       { stdio: 'inherit' }
     )
     console.log(`  ✓ Ad-hoc signing OK [${arch}]\n`)

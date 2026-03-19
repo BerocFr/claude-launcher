@@ -6,67 +6,127 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
 
 /**
- * Move to Applications — lancé au démarrage si l'app tourne depuis un DMG monté.
- * - Copie le bundle dans /Applications
- * - Supprime com.apple.quarantine (Gatekeeper) avec mot de passe macOS natif
- * - Relaunch depuis /Applications
+ * Gatekeeper bypass — 3 cas :
+ *
+ * 1. App tourne depuis un DMG (/Volumes/) :
+ *    → copie dans /Applications + strip quarantaine (mot de passe admin)
+ *
+ * 2. App tourne depuis /Applications AVEC quarantaine :
+ *    → strip silencieux sans sudo (drag depuis DMG = user owner → pas de sudo nécessaire)
+ *    → fallback dialog admin si l'app a été installée par root
+ *
+ * 3. Pas de quarantaine → no-op
  */
 async function maybeInstallToApplications(): Promise<void> {
   if (is.dev) return
-  const exePath = app.getPath('exe')
-  if (!exePath.startsWith('/Volumes/')) return
 
-  // Extraire le chemin du bundle .app
+  const exePath = app.getPath('exe')
   const match = exePath.match(/^(.*\.app)/)
   if (!match) return
 
   const appBundlePath = match[1]
   const appName = appBundlePath.split('/').pop()!
-  const destPath = `/Applications/${appName}`
+  const isInDmg = exePath.startsWith('/Volumes/')
 
-  // Déjà installé → rien à faire
-  if (existsSync(destPath)) return
+  // ── helpers ──────────────────────────────────────────────────────────────
 
+  const checkQuarantine = (p: string): boolean => {
+    try {
+      return execSync(`xattr "${p}" 2>/dev/null || true`, { encoding: 'utf8' }).includes('com.apple.quarantine')
+    } catch {
+      return false
+    }
+  }
+
+  // Sans sudo — fonctionne quand l'user est owner (drag depuis DMG)
+  const stripQuarantine = (p: string): boolean => {
+    try {
+      execSync(`xattr -rd com.apple.quarantine "${p}"`, { stdio: 'pipe' })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  // Avec mot de passe admin — fallback si app installée par root
+  const stripQuarantineAdmin = (p: string): boolean => {
+    const tmp = `/tmp/cl_${Date.now()}.sh`
+    writeFileSync(tmp, `#!/bin/bash\nxattr -rd com.apple.quarantine "${p}"\n`)
+    chmodSync(tmp, 0o755)
+    try {
+      execSync(`osascript -e 'do shell script "bash ${tmp}" with administrator privileges'`, { timeout: 30_000 })
+      unlinkSync(tmp)
+      return true
+    } catch {
+      unlinkSync(tmp)
+      return false
+    }
+  }
+
+  // ── Cas 1 : tourne depuis un DMG ─────────────────────────────────────────
+  if (isInDmg) {
+    const destPath = `/Applications/${appName}`
+    const alreadyInstalled = existsSync(destPath)
+
+    const { response } = await dialog.showMessageBox({
+      type: 'info',
+      title: 'Installer Claude Launcher',
+      message: alreadyInstalled
+        ? 'Supprimer le blocage Gatekeeper ?'
+        : 'Installer Claude Launcher dans Applications ?',
+      detail:
+        (alreadyInstalled ? '' : '• Copie dans /Applications\n') +
+        '• Supprime définitivement le blocage Gatekeeper\n\nVotre mot de passe macOS sera demandé.',
+      buttons: ['Plus tard', 'Installer'],
+      defaultId: 1,
+      cancelId: 0,
+    })
+
+    if (response === 0) return
+
+    const tmp = `/tmp/cl_install_${Date.now()}.sh`
+    const lines = ['#!/bin/bash']
+    if (!alreadyInstalled) lines.push(`cp -Rf "${appBundlePath}" /Applications/`)
+    lines.push(`xattr -rd com.apple.quarantine "${destPath}"`)
+    writeFileSync(tmp, lines.join('\n'))
+    chmodSync(tmp, 0o755)
+
+    try {
+      execSync(`osascript -e 'do shell script "bash ${tmp}" with administrator privileges'`, { timeout: 30_000 })
+    } catch {
+      unlinkSync(tmp)
+      return
+    }
+    unlinkSync(tmp)
+
+    if (!alreadyInstalled) {
+      const relativeExe = exePath.slice(appBundlePath.length)
+      app.relaunch({ execPath: destPath + relativeExe })
+      app.quit()
+    }
+    return
+  }
+
+  // ── Cas 2 : tourne depuis /Applications avec quarantaine ──────────────────
+  // L'utilisateur a passé Gatekeeper via "Open Anyway" ou clic-droit → Ouvrir.
+  // On strip maintenant pour que les prochains lancements soient directs.
+  if (!checkQuarantine(appBundlePath)) return
+
+  // Tentative silencieuse (user owner → pas de sudo requis)
+  if (stripQuarantine(appBundlePath)) return
+
+  // Fallback : app installée par un admin → mot de passe requis
   const { response } = await dialog.showMessageBox({
     type: 'info',
-    title: 'Installer Claude Launcher',
-    message: 'Déplacer Claude Launcher dans Applications ?',
-    detail:
-      'L\'app sera copiée dans /Applications et le blocage Gatekeeper supprimé.\n' +
-      '\nVotre mot de passe macOS vous sera demandé.',
-    buttons: ['Plus tard', 'Installer'],
+    title: 'Supprimer le blocage Gatekeeper',
+    message: 'Nettoyer le blocage Gatekeeper définitivement ?',
+    detail: 'Votre mot de passe macOS sera demandé une seule fois.\nLes prochains lancements seront directs.',
+    buttons: ['Plus tard', 'Supprimer'],
     defaultId: 1,
     cancelId: 0,
   })
 
-  if (response === 0) return // "Plus tard" → continue depuis le DMG
-
-  // Script temporaire pour éviter les problèmes d'échappement avec les espaces dans osascript
-  const tmpScript = `/tmp/cl_install_${Date.now()}.sh`
-  writeFileSync(
-    tmpScript,
-    ['#!/bin/bash', `cp -Rf "${appBundlePath}" /Applications/`, `xattr -rd com.apple.quarantine "${destPath}"`].join(
-      '\n'
-    )
-  )
-  chmodSync(tmpScript, 0o755)
-
-  try {
-    execSync(`osascript -e 'do shell script "bash ${tmpScript}" with administrator privileges'`, {
-      timeout: 30_000,
-    })
-  } catch {
-    // Annulé par l'utilisateur ou erreur → continue depuis le DMG
-    unlinkSync(tmpScript)
-    return
-  }
-
-  unlinkSync(tmpScript)
-
-  // Relaunch depuis /Applications
-  const relativeExe = exePath.slice(appBundlePath.length) // → /Contents/MacOS/Claude Launcher
-  app.relaunch({ execPath: destPath + relativeExe })
-  app.quit()
+  if (response === 1) stripQuarantineAdmin(appBundlePath)
 }
 
 function createWindow(): void {
