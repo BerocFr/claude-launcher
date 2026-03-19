@@ -33,30 +33,16 @@ Interface guidée en 5 étapes — aucune connaissance technique requise.
 
 > Pour vérifier votre Mac : Menu Apple → À propos de ce Mac → Puce
 
-### 2. Glisser l'app dans Applications
+### 2. Installer en un double-clic
 
-Ouvrir le DMG et faire glisser `Claude Launcher.app` dans le dossier `Applications`.
+Ouvrir le DMG, puis double-cliquer sur **`📦 Installer Claude Launcher.command`**.
 
-### 3. Contourner Gatekeeper (app non signée)
+Un terminal s'ouvre et vous guide en 3 étapes :
+1. Modale de confirmation
+2. Mot de passe macOS (pour supprimer le blocage Gatekeeper)
+3. Bouton "Lancer" pour ouvrir l'app immédiatement
 
-L'app n'est pas signée avec un certificat Apple payant. macOS bloque son ouverture directe.
-
-**macOS 12, 13, 14 (Monterey / Ventura / Sonoma) :**
-1. **Clic-droit** sur `Claude Launcher.app` → **Ouvrir**
-2. Dans la fenêtre d'alerte, cliquer **Ouvrir**
-
-**macOS 15 (Sequoia) :**
-1. Double-cliquer sur l'app → la première tentative échoue
-2. Aller dans **Réglages Système** → **Confidentialité & Sécurité**
-3. Faire défiler vers le bas → cliquer **« Ouvrir quand même »**
-
-**Si macOS affiche « n'est pas prise en charge » ou refuse toujours :**
-```bash
-xattr -d com.apple.quarantine /Applications/Claude\ Launcher.app
-```
-Puis relancer normalement. Cette commande supprime l'attribut de quarantaine posé par le navigateur au téléchargement.
-
-> Ces étapes ne sont nécessaires qu'une seule fois.
+> C'est tout. Aucune manipulation manuelle de Gatekeeper nécessaire.
 
 ---
 
