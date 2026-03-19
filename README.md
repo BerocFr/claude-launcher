@@ -33,16 +33,21 @@ Interface guidée en 5 étapes — aucune connaissance technique requise.
 
 > Pour vérifier votre Mac : Menu Apple → À propos de ce Mac → Puce
 
-### 2. Installer en un double-clic
+### 2. Ouvrir l'app depuis le DMG
 
-Ouvrir le DMG, puis double-cliquer sur **`📦 Installer Claude Launcher.command`**.
+Glisser `Claude Launcher.app` dans `Applications`, ou double-cliquer directement depuis le DMG.
 
-Un terminal s'ouvre et vous guide en 3 étapes :
-1. Modale de confirmation
-2. Mot de passe macOS (pour supprimer le blocage Gatekeeper)
-3. Bouton "Lancer" pour ouvrir l'app immédiatement
+**macOS 12–14 :** clic-droit → Ouvrir → Ouvrir dans la modale.
 
-> C'est tout. Aucune manipulation manuelle de Gatekeeper nécessaire.
+**macOS 15 (Sequoia) :** double-cliquer → aller dans Réglages Système → Confidentialité & Sécurité → **Ouvrir quand même**.
+
+### 3. Installation automatique au premier lancement
+
+À l'ouverture depuis un DMG, l'app propose automatiquement :
+- de se copier dans `/Applications`
+- de supprimer le blocage Gatekeeper
+
+Cliquer **Installer**, entrer le mot de passe macOS. C'est tout.
 
 ---
 
